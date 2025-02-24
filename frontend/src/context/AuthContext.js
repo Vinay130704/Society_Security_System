@@ -1,0 +1,1 @@
+// Placeholder content for src/context/AuthContext.js
