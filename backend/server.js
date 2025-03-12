@@ -1,39 +1,51 @@
 const express = require("express");
-const mongoose = require("mongoose");
+const http = require("http");
 const dotenv = require("dotenv");
 const cors = require("cors");
-const authRoutes = require("./routes/auth");
-const visitorRoutes = require("./routes/visitors");
-const incidentRoutes = require("./routes/incidentRoutes");
-const userRoutes = require("./routes/users");
-const errorHandler = require("./middleware/errorHandler");
-const incidentRouters= require("./routes/incidents")
+const mongoose = require("mongoose");
+const cron = require("node-cron");
 
 dotenv.config();
+const connectDB = require("./config/db");
+const deleteUnapprovedUsers = require("./utils/deleteUnapprovedUsers");
+const errorHandler = require("./middleware/errorHandler");
+
+// Routes
+const authRoutes = require("./routes/auth-router");
+const userRoutes = require("./routes/users-router");
+const visitorRoutes = require("./routes/visitor-Routers");
+const incidentRoutes = require("./routes/incidents");
+const adminRoutes = require("./routes/adminRoutes");
+
 const app = express();
+const server = http.createServer(app);
+
+
+// Middleware
 app.use(express.json());
 app.use(cors());
+app.use("/uploads", express.static("uploads"));
 
-// Database connection
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-}).then(() => console.log("MongoDB connected"))
-  .catch(err => console.log("DB connection error:", err));
+
+
+// Connect to Database
+connectDB();
 
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
-app.use("/api/visitors", visitorRoutes);
+app.use("/api/visitor", visitorRoutes);
 app.use("/api/incidents", incidentRoutes);
-app.use("/api", incidentRouters);
+app.use("/api/admin", adminRoutes);
 
-
-// Error handling middleware
+// Error Handling Middleware
 app.use(errorHandler);
 
+// Schedule a Cron Job to delete unapproved users every hour
+cron.schedule("0 * * * *", async () => {
+  await deleteUnapprovedUsers();
+});
+
+// Start Server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-// console.log("MongoDB URI:", process.env.MONGO_URI);
-// console.log("JWT Secret:", process.env.JWT_SECRET);
-console.log("Port:", process.env.PORT);
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
