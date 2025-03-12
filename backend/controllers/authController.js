@@ -2,7 +2,7 @@ const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
-// ✅ Register Function
+// Register Function
 exports.register = async (req, res) => {
   try {
     const { name, email, password, role, flat, phone } = req.body;
@@ -50,8 +50,8 @@ exports.register = async (req, res) => {
 };
 
 
-// ✅ Login Function
-exports.login = async (req, res) => {
+// Login Function
+exports.login = async (req, res) => { 
   try {
       const { email, password } = req.body;
 
@@ -64,19 +64,24 @@ exports.login = async (req, res) => {
           return res.status(401).json({ message: "Invalid email or password." });
       }
 
+      // Check if the user is approved by admin
+      if (user.approval_status !== "approved") {
+          return res.status(403).json({ message: "Your account is not approved yet. Please wait for admin approval." });
+      }
+
       const isMatch = await bcrypt.compare(password, user.password);
       if (!isMatch) {
           return res.status(401).json({ message: "Invalid email or password." });
       }
 
-      // ✅ Generate JWT token
+      // Generate JWT token
       const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
 
-      // ✅ Log the response before sending
+      // Log the response before sending
       const response = { message: "Login successful!", token };
       console.log("Login Response:", response);
 
-      // ✅ Send response
+      // Send response
       res.status(200).json(response);
   } catch (err) {
       console.error("Login Error:", err);
@@ -105,7 +110,7 @@ exports.changePassword = async (req, res) => {
       const user = await User.findById(userId);
 
       if (!user) {
-          return res.status(404).json({ message: "User not found in database." });
+          return res.status(404).json({ message: "User not found." });
       }
 
       const isMatch = await bcrypt.compare(oldPassword, user.password);
@@ -113,16 +118,16 @@ exports.changePassword = async (req, res) => {
           return res.status(400).json({ message: "Old password is incorrect." });
       }
 
-      // ✅ Hash the new password and save
+      // Hash the new password and save
       user.password = await bcrypt.hash(newPassword, 10);
       await user.save();
 
-      // ✅ Generate a new JWT token after password change
+      // Generate a new JWT token after password change
       const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
 
       res.json({ message: "Password changed successfully.", token });
   } catch (err) {
-      console.error("Error changing password:", err); // ✅ Logs the actual error for debugging
+      console.error("Error changing password:", err); // Logs the actual error for debugging
       res.status(500).json({ message: "Server error", error: err.message });
   }
 };
