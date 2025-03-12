@@ -21,7 +21,6 @@ const visitorSchema = new mongoose.Schema(
         },
     qr_code: { 
         type: String, 
-        unique: true, 
         required: true
      },
     image: { 
@@ -29,8 +28,9 @@ const visitorSchema = new mongoose.Schema(
     }, // Image URL for unregistered visitors
     entry_status: { 
         type: String, 
-        enum: ["pending", "granted", "denied"], 
-        default: "pending" },
+        enum: ["pending", "granted", "denied","Checked In", "exit"], 
+        default: "pending" 
+    },
     entry_time: { 
         type: Date
      },
