@@ -11,7 +11,6 @@ const deleteUnapprovedUsers = async () => {
       createdAt: { $lt: twentyFourHoursAgo } 
     });
 
-    console.log(`Deleted ${result.deletedCount} unapproved users`);
   } catch (error) {
     console.error("Error deleting unapproved users:", error);
   }

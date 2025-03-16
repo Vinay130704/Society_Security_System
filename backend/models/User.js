@@ -29,8 +29,10 @@ const userSchema = new mongoose.Schema(
       required: function () {
         return this.role === "resident";
       },
-      unique: true,
-      sparse: true 
+      unique: function () {
+        return this.role === "resident"; // ✅ Only enforce uniqueness for residents
+      },
+      sparse: true
     },
     approval_status: {
       type: String,
@@ -42,6 +44,15 @@ const userSchema = new mongoose.Schema(
   },
   { timestamps: true } // ✅ Correct placement of timestamps
 );
+
+
+// ✅ Remove `flat_no` if the role is not "resident"
+userSchema.pre("save", function (next) {
+  if (this.role !== "resident") {
+    this.flat_no = undefined;
+  }
+  next();
+});
 
 // ✅ Auto-delete unapproved users after 24 hours
 userSchema.index(

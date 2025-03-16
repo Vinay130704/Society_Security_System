@@ -11,21 +11,28 @@ const deleteUnapprovedUsers = require("./utils/deleteUnapprovedUsers");
 const errorHandler = require("./middleware/errorHandler");
 
 // Routes
-const authRoutes = require("./routes/auth-router");
-const userRoutes = require("./routes/users-router");
-const visitorRoutes = require("./routes/visitor-Routers");
+const staffRoutes = require("./routes/staffRoutes");
+const authRoutes = require("./routes/Auth-Router");
+const userRoutes = require("./routes/Users-Router");
+const visitorRoutes = require("./routes/Visitor-Routers");
 const incidentRoutes = require("./routes/incidents");
-const adminRoutes = require("./routes/adminRoutes");
+const adminRoutes = require("./routes/Admin-Routes");
+const vehicleRoutes = require("./routes/Vehicle-Routes");
 
 const app = express();
-const server = http.createServer(app);
 
+const corOptions = {
+  origin: "http://localhost:5173",
+  method: "GET, POST, PUT ,DELETE, PATCH, HEAD",
+  credential: true,
+};
+app.use(cors(corOptions))
 
 // Middleware
 app.use(express.json());
-app.use(cors());
-app.use("/uploads", express.static("uploads"));
+app.use(express.urlencoded({ extended: true }));
 
+app.use("/uploads", express.static("uploads"));
 
 
 // Connect to Database
@@ -37,6 +44,8 @@ app.use("/api/users", userRoutes);
 app.use("/api/visitor", visitorRoutes);
 app.use("/api/incidents", incidentRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/vehicles", vehicleRoutes);
+app.use("/api/staff", staffRoutes);
 
 // Error Handling Middleware
 app.use(errorHandler);
@@ -48,4 +57,7 @@ cron.schedule("0 * * * *", async () => {
 
 // Start Server
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});

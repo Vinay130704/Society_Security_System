@@ -26,17 +26,17 @@ const registerSchema = loginSchema.extend({
 
     role: z.enum(["admin", "security", "resident"], { required_error: "Role is required" }),
 
-    flat: z.string()
-        .trim()
-        .optional()
+    flat_no: z.string()
+    .trim()
+    .optional()
 }).superRefine((data, ctx) => {
-    if (data.role === "resident" && !data.flat) {
+    if (data.role === "resident" && !data.flat_no) {  // ✅ Correct field name
         ctx.addIssue({
             code: "custom",
             message: "Flat number is required for residents",
         });
     }
-}
-);
+});
+
 
 module.exports = { registerSchema, loginSchema };

@@ -16,7 +16,7 @@ const sendEmail = async ({ to, subject, text, html }) => {
     });
 
     const mailOptions = {
-      from: `"Admin Team" <${process.env.SENDER_EMAIL}>`,
+      from: `"Society Security System" <${process.env.SENDER_EMAIL}>`,
       to,
       subject,
       text,
@@ -24,9 +24,8 @@ const sendEmail = async ({ to, subject, text, html }) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log(` Email sent successfully to ${to}: ${info.response}`);
+    return info;
   } catch (error) {
-    console.error("Error sending email:", error);
     throw new Error("Email sending failed: " + error.message);
   }
 };

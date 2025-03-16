@@ -1,6 +1,6 @@
 const express = require("express");
 const multer = require("multer");
-const {inviteVisitor, scanQRCode, exitVisitor, captureVisitor, approveVisitor, denyVisitor} = require("../controllers/visitorController");
+const {inviteVisitor, scanQRCode, exitVisitor, captureVisitor, approveVisitor, denyVisitor} = require("../controllers/Visitor-Controller");
 const router = express.Router();
 
 // File Upload Configuration for Visitor Images
