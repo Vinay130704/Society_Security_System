@@ -40,10 +40,10 @@ const HeroSection = () => {
           <Link to="/resident/register" className="bg-secondary text-white px-6 py-3 rounded-lg shadow-md hover:bg-primary transition">
             Register as Resident
           </Link>
-          <Link to="/security/register" className="bg-secondary text-white px-6 py-3 rounded-lg shadow-md hover:bg-primary transition">
+          <Link to="/login" className="bg-secondary text-white px-6 py-3 rounded-lg shadow-md hover:bg-primary transition">
             Register as Security Guard
           </Link>
-          <Link to="/admin/login" className="bg-primary text-white px-6 py-3 rounded-lg shadow-md hover:bg-secondary transition">
+          <Link to="/login" className="bg-primary text-white px-6 py-3 rounded-lg shadow-md hover:bg-secondary transition">
             Admin Login
           </Link>
         </motion.div>

@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { Menu, X } from "lucide-react"; // Import icons for mobile menu
+import { Link, NavLink } from "react-router-dom";
+import { Menu, X } from "lucide-react";
+import { useAuth } from "../Context/AuthContext"; // ✅ Import useAuth
 
 const Navbar = () => {
+  const { isLoggedIn, LogoutUser } = useAuth(); // ✅ Now useAuth is defined
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -15,12 +17,23 @@ const Navbar = () => {
 
         {/* Desktop Menu */}
         <div className="hidden md:flex space-x-6 text-background">
-          <Link to="/" className="hover:text-secondary">Home</Link>
-          <Link to="/about" className="hover:text-secondary">About Us</Link>
-          <Link to="/features" className="hover:text-secondary">Features</Link>
-          <Link to="/login" className="hover:text-secondary">Login</Link>
-          <Link to="/register" className="hover:text-secondary">Register</Link>
-          <Link to="/contact" className="hover:text-secondary">Contact Us</Link>
+          <NavLink to="/" className="hover:text-secondary">Home</NavLink>
+          <NavLink to="/about" className="hover:text-secondary">About Us</NavLink>
+          <NavLink to="/features" className="hover:text-secondary">Features</NavLink>
+          <NavLink to="/contact" className="hover:text-secondary">Contact Us</NavLink>
+          {isLoggedIn ? (
+            <button
+              onClick={LogoutUser}
+              className="py-2 px-4 bg-red-500 hover:bg-red-600 rounded-md transition"
+            >
+              Logout
+            </button>
+          ) : (
+            <>
+              <NavLink to="/login" className="hover:text-secondary">Login</NavLink>
+              <NavLink to="/resident/register" className="hover:text-secondary">Register</NavLink>
+            </>
+          )}
         </div>
 
         {/* Mobile Menu Button */}
@@ -32,12 +45,23 @@ const Navbar = () => {
       {/* Mobile Menu */}
       {isOpen && (
         <div className="md:hidden bg-secondary px-6 py-4 space-y-4">
-          <Link to="/" className="block text-white" onClick={() => setIsOpen(false)}>Home</Link>
-          <Link to="/about" className="block text-white" onClick={() => setIsOpen(false)}>About Us</Link>
-          <Link to="/features" className="block text-white" onClick={() => setIsOpen(false)}>Features</Link>
-          <Link to="/login" className="block text-white" onClick={() => setIsOpen(false)}>Login</Link>
-          <Link to="/register" className="block text-white" onClick={() => setIsOpen(false)}>Register</Link>
-          <Link to="/contact" className="block text-white" onClick={() => setIsOpen(false)}>Contact Us</Link>
+          <NavLink to="/" className="block text-white" onClick={() => setIsOpen(false)}>Home</NavLink>
+          <NavLink to="/about" className="block text-white" onClick={() => setIsOpen(false)}>About Us</NavLink>
+          <NavLink to="/features" className="block text-white" onClick={() => setIsOpen(false)}>Features</NavLink>
+          <NavLink to="/contact" className="block text-white" onClick={() => setIsOpen(false)}>Contact Us</NavLink>
+          {isLoggedIn ? (
+            <button
+              onClick={() => { LogoutUser(); setIsOpen(false); }}
+              className="block py-2 px-4 bg-red-500 hover:bg-red-600 rounded-md transition text-center w-full"
+            >
+              Logout
+            </button>
+          ) : (
+            <>
+              <NavLink to="/login" className="block text-white" onClick={() => setIsOpen(false)}>Login</NavLink>
+              <NavLink to="/resident/register" className="block text-white" onClick={() => setIsOpen(false)}>Register</NavLink>
+            </>
+          )}
         </div>
       )}
     </nav>

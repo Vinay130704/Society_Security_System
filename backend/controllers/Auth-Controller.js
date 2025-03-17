@@ -51,43 +51,43 @@ exports.register = async (req, res) => {
 };
 
 
-
-// Login Function
+// login function
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ message: "Email and password are required." });
+      return res.status(400).json({ message: "Email and password are required" });
     }
 
+    // Find user by email
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(401).json({ message: "Invalid email or password." });
+      return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    // Check if the user is approved by admin
+    // Check if the user is approved
     if (user.approval_status !== "approved") {
       return res.status(403).json({ message: "Your account is not approved yet. Please wait for admin approval." });
     }
 
+    // Verify password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(401).json({ message: "Invalid email or password." });
+      return res.status(401).json({ message: "Invalid email or password" });
     }
 
     // Generate JWT token
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+    const token = jwt.sign(
+      { userId: user._id, role: user.role },
+      process.env.JWT_SECRET, 
+      { expiresIn: "1h" }
+    );
 
-    // Log the response before sending
-    const response = { message: "Login successful!", token };
-    console.log("Login Response:", response);
-
-    // Send response
-    res.status(200).json(response);
-  } catch (err) {
-    console.error("Login Error:", err);
-    res.status(500).json({ success: false, message: "Server error", error: err.message });
+    res.status(200).json({ token, role: user.role, message: "Login successful!" });
+  } catch (error) {
+    console.error("Login Error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
@@ -133,3 +133,6 @@ exports.changePassword = async (req, res) => {
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };
+
+
+
