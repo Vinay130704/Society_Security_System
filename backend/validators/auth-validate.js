@@ -11,8 +11,6 @@ const loginSchema = z.object({
         .max(255, { message: "Password must be at most 255 characters" })
 });
 
-
-// Register schema extends login schema
 const registerSchema = loginSchema.extend({
     name: z.string({ required_error: "Username is required" })
         .trim()
@@ -27,16 +25,15 @@ const registerSchema = loginSchema.extend({
     role: z.enum(["admin", "security", "resident"], { required_error: "Role is required" }),
 
     flat_no: z.string()
-    .trim()
-    .optional()
+        .trim()
+        .optional()
 }).superRefine((data, ctx) => {
-    if (data.role === "resident" && !data.flat_no) {  // ✅ Correct field name
+    if (data.role === "resident" && !data.flat_no) {
         ctx.addIssue({
             code: "custom",
             message: "Flat number is required for residents",
         });
     }
 });
-
 
 module.exports = { registerSchema, loginSchema };

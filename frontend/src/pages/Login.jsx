@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import LoginImage from "../assets/signup.jpeg"; // Ensure the image path is correct
 import { useAuth } from "../Context/AuthContext"; // Corrected import path
+import { toast } from "react-toastify";
 
 const URL = "http://localhost:5000/api/auth/login";
 
@@ -23,36 +24,49 @@ const Login = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(loginData),
       });
-
+  
       const data = await response.json();
-      console.log("Login response:", data);
-
+  
       if (response.ok) {
-        alert("Login successful!");
-
+        toast.success("Login successful!");
+  
         // ✅ Store JWT token and user role
         localStorage.setItem("token", data.token);
         localStorage.setItem("role", data.role);
-
+  
         // ✅ Update AuthContext if available
         if (setToken) setToken(data.token);
-
+  
+        // ✅ Check if it's a first-time login with a temporary password
+        if (data.isTempPassword) {
+          toast.info("You must reset your password before proceeding.");
+          navigate("/reset-password");
+          return;
+        }
+  
         // ✅ Navigate based on user role
         const roleRedirects = {
           admin: "/admin/admin-dashboard",
           resident: "/resident/resident-dashboard",
           security: "/security/security-dashboard",
         };
-
+  
         navigate(roleRedirects[data.role] || "/");
       } else {
-        alert(data.message || "Invalid credentials");
+        // 🛑 Backend validation error handling
+        if (data.extraDetails) {
+          toast.info(data.extraDetails); // Show specific backend error message
+        } else {
+          toast.error(data.message || "Login failed!");
+        }
       }
     } catch (error) {
       console.log("Error during login:", error);
-      alert("Something went wrong. Please try again.");
+      toast.error("Something went wrong. Please try again.");
     }
   };
+  
+  
 
   return (
     <div className="flex justify-center items-center h-screen bg-gray-100">
@@ -67,15 +81,15 @@ const Login = () => {
           <h2 className="text-2xl font-bold text-center text-primary mb-4">Login</h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <input type="email" name="email" placeholder="Email" value={loginData.email} onChange={handleChange} className="w-full p-2 border rounded-md" required />
-            <input type="password" name="password" placeholder="Password" value={loginData.password} onChange={handleChange} className="w-full p-2 border rounded-md" required />
+            <input type="email" name="email" placeholder="Email" value={loginData.email} onChange={handleChange} className="w-full p-2 border rounded-md"  />
+            <input type="password" name="password" placeholder="Password" value={loginData.password} onChange={handleChange} className="w-full p-2 border rounded-md"  />
 
             <button type="submit" className="w-full bg-secondary text-white py-2 rounded-md hover:bg-primary transition">Login</button>
           </form>
 
           <p className="text-center mt-4 text-gray-600">
             Don't have an account? 
-            <a href="/resident/register" className="text-primary font-bold hover:underline ml-1">Sign Up</a>
+            <a href="/resident-register" className="text-primary font-bold hover:underline ml-1">Sign Up</a>
           </p>
           <p className="text-center mt-4 text-gray-600">
             Reset Password 

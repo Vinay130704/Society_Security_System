@@ -1,21 +1,19 @@
 import { useState } from "react";
 import { Link, NavLink } from "react-router-dom";
-import { Menu, X } from "lucide-react";
-import { useAuth } from "../Context/AuthContext"; // ✅ Import useAuth
+import { Menu, X, Home } from "lucide-react";
+import { useAuth } from "../Context/AuthContext";
 
 const Navbar = () => {
-  const { isLoggedIn, LogoutUser } = useAuth(); // ✅ Now useAuth is defined
+  const { isLoggedIn, LogoutUser } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
   return (
     <nav className="bg-primary text-white fixed w-full top-0 shadow-md z-50">
       <div className="container mx-auto px-6 py-4 flex justify-between items-center">
-        {/* Logo */}
-        <Link to="/" className="text-xl font-bold text-secondary">
-          Society Security System
+        <Link to="/" className="text-xl font-bold text-secondary flex items-center">
+          <Home className="mr-2" /> Society Security System
         </Link>
 
-        {/* Desktop Menu */}
         <div className="hidden md:flex space-x-6 text-background">
           <NavLink to="/" className="hover:text-secondary">Home</NavLink>
           <NavLink to="/about" className="hover:text-secondary">About Us</NavLink>
@@ -36,13 +34,11 @@ const Navbar = () => {
           )}
         </div>
 
-        {/* Mobile Menu Button */}
         <button className="md:hidden" onClick={() => setIsOpen(!isOpen)}>
           {isOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
       </div>
 
-      {/* Mobile Menu */}
       {isOpen && (
         <div className="md:hidden bg-secondary px-6 py-4 space-y-4">
           <NavLink to="/" className="block text-white" onClick={() => setIsOpen(false)}>Home</NavLink>

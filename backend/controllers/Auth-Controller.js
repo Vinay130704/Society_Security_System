@@ -1,6 +1,7 @@
-const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const User = require("../models/User");
+const { sendOTP, verifyOTP } = require("../utils/otpSend");
 
 // Register Function
 exports.register = async (req, res) => {
@@ -63,7 +64,7 @@ exports.login = async (req, res) => {
     // Find user by email
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(401).json({ message: "Invalid email or password" });
+      return res.status(401).json({ message: "Invalid credentials" });
     }
 
     // Check if the user is approved
@@ -92,47 +93,44 @@ exports.login = async (req, res) => {
 };
 
 
-
-// Change Password Function
-exports.changePassword = async (req, res) => {
+exports.requestOTP = async (req, res) => {
   try {
-    console.log("Request User:", req.user);
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: "User not found." });
 
-    if (!req.user || !req.user.userId) {
-      return res.status(401).json({ message: "Unauthorized: No user ID found in token." });
+    const otpResponse = await sendOTP(email);
+    if (!otpResponse.success) {
+      return res.status(500).json({ message: "Error sending OTP." });
     }
 
-    const { userId } = req.user;
-    const { oldPassword, newPassword } = req.body;
-
-    if (!oldPassword || !newPassword) {
-      return res.status(400).json({ message: "Both old and new passwords are required." });
-    }
-
-    const user = await User.findById(userId);
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found." });
-    }
-
-    const isMatch = await bcrypt.compare(oldPassword, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ message: "Old password is incorrect." });
-    }
-
-    // Hash the new password and save
-    user.password = await bcrypt.hash(newPassword, 10);
-    await user.save();
-
-    // Generate a new JWT token after password change
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
-
-    res.json({ message: "Password changed successfully.", token });
+    res.json({ message: "OTP sent successfully." });
   } catch (err) {
-    console.error("Error changing password:", err); // Logs the actual error for debugging
+    console.error("Error sending OTP:", err);
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };
 
 
+exports.changePassword = async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
 
+    if (!verifyOTP(email, otp)) {
+      return res.status(400).json({ message: "Invalid or expired OTP." });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: "User not found." });
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+
+    res.json({ message: "Password changed successfully.", token });
+  } catch (err) {
+    console.error("Error changing password:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+};

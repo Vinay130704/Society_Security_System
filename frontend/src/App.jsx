@@ -14,6 +14,8 @@ import ResidentRoutes from "./router/ResidentRoutes";
 import SecurityRoutes from "./router/SecurityRoutes";
 import ChangePassword from "./pages/ResetPassword";
 import AdminRoutes from "./router/AdminRoutes";
+import ProtectedRoute from "./components/ProtectedRoute";
+import ResidentSignup from "./pages/Resident/ResidentRegister";
 
 function App() {
   return (
@@ -30,15 +32,23 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
         <Route path="/reset-password" element={<ChangePassword />} />
+        <Route path="/resident-register" element={<ResidentSignup />} />
 
         {/* Route for Security Guards */}
-        <Route path="/security/*" element={<SecurityRoutes />} />
+        <Route element={<ProtectedRoute />}>
+          <Route path="/security/*" element={<SecurityRoutes />} />
+        </Route>
 
         {/* Route for Resident Guards */}
-        <Route path="/resident/*" element={<ResidentRoutes />} />
+        <Route element={<ProtectedRoute />}>
+          <Route path="/resident/*" element={<ResidentRoutes />} />
+        </Route>
 
         {/* Route for Admin Guards */}
-        <Route path="/admin/*" element={<AdminRoutes />} />
+        <Route element={<ProtectedRoute />}>
+          <Route path="/admin/*" element={<AdminRoutes />} />
+        </Route>
+
       </Routes>
       <Footer />
     </>

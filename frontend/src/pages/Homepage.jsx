@@ -12,7 +12,7 @@ const HeroSection = () => {
 
       {/* Content */}
       <div className="relative z-10 text-center text-text px-6 md:px-12 flex flex-col items-center justify-center h-screen">
-        <motion.h1 
+        <motion.h1
           className="text-3xl md:text-5xl font-bold text-primary"
           initial={{ opacity: 0, y: -30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -20,8 +20,8 @@ const HeroSection = () => {
         >
           Smart & Secure Society Management System
         </motion.h1>
-        
-        <motion.p 
+
+        <motion.p
           className="text-lg md:text-xl mt-4 max-w-2xl"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -31,15 +31,16 @@ const HeroSection = () => {
         </motion.p>
 
         {/* Buttons */}
-        <motion.div 
+        <motion.div
           className="mt-8 flex flex-col md:flex-row gap-4 justify-center"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.6, duration: 1 }}
         >
-          <Link to="/resident/register" className="bg-secondary text-white px-6 py-3 rounded-lg shadow-md hover:bg-primary transition">
+          <Link to="/resident-register" className="bg-secondary text-white px-6 py-3 rounded-lg shadow-md hover:bg-primary transition">
             Register as Resident
           </Link>
+
           <Link to="/login" className="bg-secondary text-white px-6 py-3 rounded-lg shadow-md hover:bg-primary transition">
             Register as Security Guard
           </Link>

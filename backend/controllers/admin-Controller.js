@@ -23,7 +23,7 @@ exports.approveUser = async (req, res) => {
     }
 
     // Generate a temporary password
-    const tempPassword = Math.random().toString(36).slice(-8); // Random 8-character password
+    const tempPassword = Math.random().toString(36).slice(-6); // Random 8-character password
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
     // Update approval status and password

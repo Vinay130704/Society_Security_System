@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { toast } from "react-toastify"; // ✅ Import Toast
+import "react-toastify/dist/ReactToastify.css"; // ✅ Import Toast CSS
 import SignupImage from "../assets/signup.jpeg";
 
 const URL = "http://localhost:5000/api/auth/register";
@@ -26,7 +28,7 @@ const Signup = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Ensure flat_no is only sent for residents
+    // Ensure `flat_no` is only sent for residents
     const userData =
       user.role === "resident"
         ? user
@@ -45,21 +47,29 @@ const Signup = () => {
       console.log("Server Response:", responseData);
 
       if (response.ok) {
-        alert("Registration Successful. Awaiting Admin Approval.");
+        toast.success("Registration Successful! Awaiting Admin Approval.");
+
+        // ✅ Clear Form
         setUser({
           name: "",
           email: "",
           password: "",
           phone: "",
           role: "security",
-         
         });
-        navigate("/");
+
+        setTimeout(() => navigate("/"), 2000); // Redirect after 2 sec
       } else {
-        alert(responseData.message || "Something went wrong.");
+        // Handle validation errors from the backend
+        if (data.extraDetails) {
+          toast.info(data.extraDetails); // Show backend validation message
+        } else {
+          toast.error(data.message || "Registration failed!");
+        }
       }
     } catch (error) {
       console.error("Registration Error!", error);
+      toast.error("Network error. Please try again.");
     }
   };
 
