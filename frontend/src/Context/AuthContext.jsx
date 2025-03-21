@@ -10,6 +10,7 @@ export const AuthProvider = ({ children }) => {
     setIsLoggedIn(!!token);
   }, [token]);
 
+  
   const LogoutUser = () => {
     console.log("Logging out...");
     setToken(null);

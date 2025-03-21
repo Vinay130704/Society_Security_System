@@ -13,15 +13,17 @@ import AboutUs from "./pages/About";
 import ResidentRoutes from "./router/ResidentRoutes";
 import SecurityRoutes from "./router/SecurityRoutes";
 import ChangePassword from "./pages/ResetPassword";
-import AdminRoutes from "./router/AdminRoutes";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ResidentSignup from "./pages/Resident/ResidentRegister";
+import UserManagement from "./pages/Admin/UsersManagement";
+import ManageResidents from "./pages/Admin/ManageResidents";
 
 function App() {
   return (
     <>
       <Navbar />
       <Routes>
+        {/* Public Routes */}
         <Route path="/" element={<HomePage />} />
         <Route path="/about" element={<AboutUs />} />
         <Route path="/features" element={<FeaturesSection />} />
@@ -34,21 +36,17 @@ function App() {
         <Route path="/reset-password" element={<ChangePassword />} />
         <Route path="/resident-register" element={<ResidentSignup />} />
 
-        {/* Route for Security Guards */}
+        {/* Protected Routes */}
         <Route element={<ProtectedRoute />}>
           <Route path="/security/*" element={<SecurityRoutes />} />
-        </Route>
-
-        {/* Route for Resident Guards */}
-        <Route element={<ProtectedRoute />}>
           <Route path="/resident/*" element={<ResidentRoutes />} />
-        </Route>
 
-        {/* Route for Admin Guards */}
-        <Route element={<ProtectedRoute />}>
-          <Route path="/admin/*" element={<AdminRoutes />} />
+          {/* Admin Routes */}
+          <Route path="/admin/*">
+            <Route path="user-management" element={<UserManagement />} /> {/* ✅ Fixed */}
+            <Route path="manage-residents" element={<ManageResidents />} />
+            </Route>
         </Route>
-
       </Routes>
       <Footer />
     </>

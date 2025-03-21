@@ -19,53 +19,61 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(loginData),
-      });
-  
-      const data = await response.json();
-  
-      if (response.ok) {
-        toast.success("Login successful!");
-  
-        // ✅ Store JWT token and user role
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("role", data.role);
-  
-        // ✅ Update AuthContext if available
-        if (setToken) setToken(data.token);
-  
-        // ✅ Check if it's a first-time login with a temporary password
-        if (data.isTempPassword) {
-          toast.info("You must reset your password before proceeding.");
-          navigate("/reset-password");
-          return;
-        }
-  
-        // ✅ Navigate based on user role
-        const roleRedirects = {
-          admin: "/admin/admin-dashboard",
-          resident: "/resident/resident-dashboard",
-          security: "/security/security-dashboard",
-        };
-  
-        navigate(roleRedirects[data.role] || "/");
-      } else {
-        // 🛑 Backend validation error handling
-        if (data.extraDetails) {
-          toast.info(data.extraDetails); // Show specific backend error message
+        const response = await fetch(URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(loginData),
+        });
+
+        const data = await response.json();
+        console.log("Server Response:", data); // ✅ Debugging
+
+        if (response.ok) {
+            toast.success("Login successful!");
+
+            // ✅ Store JWT token and user role
+            localStorage.setItem("token", data.token);
+            localStorage.setItem("role", data.role);
+
+            // ✅ Update AuthContext if available
+            if (setToken) setToken(data.token);
+
+            // ✅ Check if it's a first-time login with a temporary password
+            if (data.isTempPassword) {
+                toast.info("You must reset your password before proceeding.");
+                navigate("/reset-password");
+                return;
+            }
+
+            // ✅ Navigate based on user role
+            const roleRedirects = {
+                admin: "/admin/admin-dashboard",
+                resident: "/resident/resident-dashboard",
+                security: "/security/security-dashboard",
+            };
+
+            const redirectPath = roleRedirects[data.role];
+
+            if (redirectPath) {
+                console.log("Navigating to:", redirectPath); // ✅ Debugging
+                navigate(redirectPath);
+            } else {
+                console.warn("Invalid role received:", data.role);
+                toast.error("Invalid role detected. Please contact support.");
+            }
         } else {
-          toast.error(data.message || "Login failed!");
+            if (data.extraDetails) {
+                toast.info(data.extraDetails);
+            } else {
+                toast.error(data.message || "Login failed!");
+            }
         }
-      }
     } catch (error) {
-      console.log("Error during login:", error);
-      toast.error("Something went wrong. Please try again.");
+        console.error("Error during login:", error);
+        toast.error("Something went wrong. Please try again.");
     }
-  };
-  
+};
+
   
 
   return (

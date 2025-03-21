@@ -13,7 +13,6 @@ const errorHandler = require("./middleware/errorHandler");
 // Routes
 const staffRoutes = require("./routes/staffRoutes");
 const authRoutes = require("./routes/Auth-Router");
-const userRoutes = require("./routes/Users-Router");
 const visitorRoutes = require("./routes/Visitor-Routers");
 const incidentRoutes = require("./routes/incidents");
 const adminRoutes = require("./routes/Admin-Routes");
@@ -40,7 +39,6 @@ connectDB();
 
 // Routes
 app.use("/api/auth", authRoutes);
-app.use("/api/users", userRoutes);
 app.use("/api/visitor", visitorRoutes);
 app.use("/api/incidents", incidentRoutes);
 app.use("/api/admin", adminRoutes);
