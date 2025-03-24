@@ -1,35 +1,69 @@
-const express = require("express");
-const axios = require("axios");
+require('dotenv').config();
+const express = require('express');
+const bodyParser = require('body-parser');
+const admin = require('firebase-admin');
+const serviceAccount = require('../society-security-system.json');
 
 const app = express();
-app.use(express.json());
+app.use(bodyParser.json());
 
-const SERVER_KEY = "YOUR_FIREBASE_SERVER_KEY"; // Get from Firebase Console
+// Initialize Firebase Admin SDK
+admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+});
 
-// 🔹 Send Push Notification
-app.post("/send-notification", async (req, res) => {
-    const { token, title, body } = req.body;
+// Store verified numbers
+let verifiedNumbers = new Set();
 
-    const message = {
-        to: token,
-        notification: {
-            title: title,
-            body: body,
-        }
-    };
+/** 
+ * Step 1: Send OTP for Verification
+ */
+app.post('/send-verification', async (req, res) => {
+    const { phone } = req.body;
 
     try {
-        const response = await axios.post("https://fcm.googleapis.com/fcm/send", message, {
-            headers: {
-                "Authorization": `key=${SERVER_KEY}`,
-                "Content-Type": "application/json"
-            }
-        });
-        res.json({ success: true, response: response.data });
+        const session = await admin.auth().createSessionCookie(phone, { expiresIn: 60 * 5 * 1000 });
+        res.json({ success: true, session });
     } catch (error) {
-        res.json({ success: false, error: error.message });
+        res.status(400).json({ success: false, error: error.message });
+    }
+});
+
+/** 
+ * Step 2: Verify OTP 
+ */
+app.post('/verify-code', async (req, res) => {
+    const { phone, code } = req.body;
+
+    try {
+        // Firebase automatically verifies OTP via frontend UI
+        verifiedNumbers.add(phone);
+        res.json({ success: true, message: 'Phone number verified successfully' });
+    } catch (error) {
+        res.status(400).json({ success: false, error: error.message });
+    }
+});
+
+/** 
+ * Step 3: Send SMS to Verified Numbers (Using Free Service)
+ */
+app.post('/send-sms', async (req, res) => {
+    const { message } = req.body;
+
+    try {
+        if (verifiedNumbers.size === 0) {
+            return res.status(400).json({ success: false, message: 'No verified numbers found' });
+        }
+
+        for (let phone of verifiedNumbers) {
+            console.log(`Sending SMS to ${phone}: ${message}`);
+        }
+
+        res.json({ success: true, message: 'SMS sent successfully (Simulated)' });
+    } catch (error) {
+        res.status(400).json({ success: false, error: error.message });
     }
 });
 
 // Start Server
-app.listen(3001, () => console.log("Server running on port 3001"));
+app.listen(3000, () => console.log('Server running on port 3000'));

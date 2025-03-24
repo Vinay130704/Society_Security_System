@@ -1,20 +1,12 @@
 const express = require("express");
-const { 
-  approveUser, 
-  getAllUsers, 
-  updateUserProfile,  // ✅ Fixed function name
-  rejectUser, 
-  removeResident 
-} = require("../controllers/Admin-Controller");
-
-const authMiddleware = require("../middleware/authMiddleware"); 
-
+const { approveUser, rejectUser, getUsers, updateUserProfile, removeResident } = require("../controllers/admin-controller");
 const router = express.Router();
+
 
 router.put("/approve/:userId", approveUser);
 router.put("/reject/:userId", rejectUser);
-router.get("/users", authMiddleware, getAllUsers);
-router.put("/update/:id", authMiddleware, updateUserProfile); // ✅ Fixed function name
+router.get("/users", getUsers);  
+router.put("/update/:id", updateUserProfile);
 router.delete("/remove/:id", removeResident);
 
 module.exports = router;

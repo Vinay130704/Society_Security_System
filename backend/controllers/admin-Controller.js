@@ -3,8 +3,8 @@ const User = require("../models/User");
 const sendEmail = require("../utils/sendEmail");
 const bcrypt = require("bcrypt");
 
-// ✅ Approve a user
-exports.approveUser = async (req, res) => {
+// Approve a user
+const approveUser = async (req, res) => {
   try {
     const { userId } = req.params;
 
@@ -56,8 +56,8 @@ exports.approveUser = async (req, res) => {
   }
 };
 
-// ✅ Reject a user
-exports.rejectUser = async (req, res) => {
+// Reject a user
+const rejectUser = async (req, res) => {
   try {
     const { userId } = req.params;
     const { remark } = req.body;
@@ -105,14 +105,19 @@ exports.rejectUser = async (req, res) => {
   }
 };
 
-// ✅ Get all users (Admin Only)
-exports.getAllUsers = async (req, res) => {
+// Get  users (Admin Only)
+const getUsers = async (req, res) => {
   try {
+    console.log("🔹 getUsers function executed!");
+
     if (!req.user || req.user.role !== "admin") {
+      console.log("Unauthorized Access Attempt");
       return res.status(403).json({ error: "Unauthorized access" });
     }
 
     const users = await User.find().select("name email role flat_no approval_status remark");
+    console.log("Users Fetched Successfully", users);
+
     res.status(200).json({ success: true, users });
   } catch (error) {
     console.error("Error fetching users:", error);
@@ -120,8 +125,9 @@ exports.getAllUsers = async (req, res) => {
   }
 };
 
-// ✅ Update user profile (Fixed name)
-exports.updateUserProfile = async (req, res) => {
+
+// Update user profile (Fixed name)
+const updateUserProfile = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, email, phone } = req.body;
@@ -139,8 +145,8 @@ exports.updateUserProfile = async (req, res) => {
   }
 };
 
-// ✅ Remove a resident
-exports.removeResident = async (req, res) => {
+// Remove a resident
+const removeResident = async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -154,3 +160,12 @@ exports.removeResident = async (req, res) => {
     res.status(500).json({ error: "Failed to remove user" });
   }
 };
+
+
+
+
+module.exports = { approveUser, rejectUser, getUsers, updateUserProfile, removeResident };
+
+
+
+

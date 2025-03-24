@@ -11,12 +11,12 @@ const deleteUnapprovedUsers = require("./utils/deleteUnapprovedUsers");
 const errorHandler = require("./middleware/errorHandler");
 
 // Routes
-const staffRoutes = require("./routes/staffRoutes");
-const authRoutes = require("./routes/Auth-Router");
+const staffRoutes = require("./routes/Staff-Routes");
+const authRoutes = require("./routes/Auth-Routes");
 const visitorRoutes = require("./routes/Visitor-Routers");
-const incidentRoutes = require("./routes/incidents");
 const adminRoutes = require("./routes/Admin-Routes");
 const vehicleRoutes = require("./routes/Vehicle-Routes");
+const deliveryRoutes = require("./routes/Delivery-Routes");
 
 const app = express();
 
@@ -40,10 +40,10 @@ connectDB();
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/visitor", visitorRoutes);
-app.use("/api/incidents", incidentRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/vehicles", vehicleRoutes);
 app.use("/api/staff", staffRoutes);
+app.use("/api/delivery", deliveryRoutes);
 
 // Error Handling Middleware
 app.use(errorHandler);

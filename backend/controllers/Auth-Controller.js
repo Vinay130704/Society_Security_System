@@ -7,7 +7,7 @@ const { sendOTP, verifyOTP } = require("../utils/otpSend");
 exports.register = async (req, res) => {
   try {
     const { name, email, password, role, flat_no, phone } = req.body;
-    console.log("Extracted Data:", { name, email, password, role, flat_no, phone }); // Debugging
+    console.log("Extracted Data:", { name, email, password, role, flat_no, phone }); 
 
     // Check if email already exists
     const existingUser = await User.findOne({ email });
