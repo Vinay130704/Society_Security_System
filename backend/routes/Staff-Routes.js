@@ -1,26 +1,30 @@
 const express = require("express");
 const router = express.Router();
-const {
-  registerStaff,
-  getResidentStaff,
-  blockStaff,
-  unblockStaff,
-  deleteStaff,
-} = require("../controllers/Staff-Controller");
+const staffController = require("../controllers/Staff-Controller");
 
-// Register a staff member
-router.post("/register", registerStaff);
+// ✅ Register Staff
+router.post("/add-staff", staffController.registerStaff);
 
-// Get all staff for a resident
-router.get("/:residentId", getResidentStaff);
+// ✅ Get All Staff Members of a Resident
+router.get("/resident/:residentId", staffController.getResidentStaff);
 
-// Block staff
-router.put("/block/:staffId", blockStaff);
+// ✅ Block Staff Member
+router.put("/block/:staffId", staffController.blockStaff);
 
-// Unblock staff
-router.put("/unblock/:staffId", unblockStaff);
+// ✅ Unblock Staff Member
+router.put("/unblock/:staffId", staffController.unblockStaff);
 
-// Delete staff
-router.delete("/delete/:staffId", deleteStaff);
+// ✅ Delete Staff Member (Cancel Permanent ID)
+router.delete("/delete/:staffId", staffController.deleteStaff);
+
+
+// ✅ Staff Entry Check (Security Guard)
+router.post("/entry", staffController.staffEntry);
+
+// ✅ Staff Exit Check (Security Guard)
+router.post("/exit", staffController.staffExit);
+
+// ✅ Get Staff Entry-Exit History
+router.get("/history/:permanentId", staffController.getStaffHistory);
 
 module.exports = router;

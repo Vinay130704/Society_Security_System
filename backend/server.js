@@ -18,6 +18,7 @@ const adminRoutes = require("./routes/Admin-Routes");
 const vehicleRoutes = require("./routes/Vehicle-Routes");
 const deliveryRoutes = require("./routes/Delivery-Routes");
 const emergencyRoutes = require("./routes/EmergencyRoutes");
+const workerRoutes = require("./routes/workerRoutes");
 
 const app = express();
 const server = http.createServer(app);
@@ -42,6 +43,7 @@ app.use("/api/vehicles", vehicleRoutes);
 app.use("/api/staff", staffRoutes);
 app.use("/api/delivery", deliveryRoutes);
 app.use("/api/emergency", emergencyRoutes);
+app.use("/api/worker", workerRoutes);
 
 // Error Handling Middleware
 app.use(errorHandler);
