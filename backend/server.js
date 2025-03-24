@@ -4,6 +4,7 @@ const dotenv = require("dotenv");
 const cors = require("cors");
 const mongoose = require("mongoose");
 const cron = require("node-cron");
+const { Server } = require("socket.io");
 
 dotenv.config();
 const connectDB = require("./config/db");
@@ -17,6 +18,7 @@ const visitorRoutes = require("./routes/Visitor-Routers");
 const adminRoutes = require("./routes/Admin-Routes");
 const vehicleRoutes = require("./routes/Vehicle-Routes");
 const deliveryRoutes = require("./routes/Delivery-Routes");
+const emergencyRoutes = require("./routes/EmergencyRoutes");
 
 const app = express();
 
@@ -26,6 +28,15 @@ const corOptions = {
   credential: true,
 };
 app.use(cors(corOptions))
+
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "http://localhost:5173",
+    methods: ["GET", "POST"],
+    credentials: true,
+  },
+});
 
 // Middleware
 app.use(express.json());
@@ -44,6 +55,22 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/vehicles", vehicleRoutes);
 app.use("/api/staff", staffRoutes);
 app.use("/api/delivery", deliveryRoutes);
+app.use("/api/emergency", emergencyRoutes);
+
+
+// WebSocket connection
+io.on("connection", (socket) => {
+  console.log("New client connected");
+
+  socket.on("disconnect", () => {
+    console.log("Client disconnected");
+  });
+});
+
+// Attach io instance to exports
+exports.io = io;
+
+
 
 // Error Handling Middleware
 app.use(errorHandler);

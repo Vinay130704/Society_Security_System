@@ -6,7 +6,7 @@ const {
   blockStaff,
   unblockStaff,
   deleteStaff,
-} = require("../controllers/staffController");
+} = require("../controllers/Staff-Controller");
 
 // Register a staff member
 router.post("/register", registerStaff);
