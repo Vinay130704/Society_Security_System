@@ -3,21 +3,16 @@ import { Routes, Route } from "react-router-dom";
 import AdminDashboard from "../pages/Admin/AdminDashboard";
 import ManageResidents from "../pages/Admin/ManageResidents";
 import UserManagement from "../pages/Admin/UsersManagement";
-import Sidebar from "../pages/Admin/AdminSidebar";
+import VisitorLogs from "../pages/Admin/VisitorLogs";
 
 const AdminRoutes = () => {
   return (
-    <div className="flex">
-      {/* <Sidebar /> */}
-      <div className="flex-grow p-4">
-        <Routes>
-          <Route path="/admin-dashboard" element={<AdminDashboard />} />
-          <Route path="/user-management" element={<UserManagement />} />
-          <Route path="/manage-residents" element={<ManageResidents />} />
-          <Route path="/sidebar" element={<Sidebar />} />
-        </Routes>
-      </div>
-    </div>
+    <Routes>
+      <Route path="admin-dashboard" element={<AdminDashboard />} />
+      <Route path="user-management" element={<UserManagement />} />
+      <Route path="manage-residents" element={<ManageResidents />} />
+      <Route path="visitor-log" element={<VisitorLogs />} />
+    </Routes>
   );
 };
 

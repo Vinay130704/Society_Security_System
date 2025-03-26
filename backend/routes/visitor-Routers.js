@@ -1,7 +1,7 @@
 const express = require("express");
 const multer = require("multer");
-const {inviteVisitor, scanQRCode, exitVisitor, captureVisitor, approveVisitor, denyVisitor} = require("../controllers/Visitor-Controller");
 const router = express.Router();
+const visitorController = require("../controllers/Visitor-Controller");
 
 // File Upload Configuration for Visitor Images
 const storage = multer.diskStorage({
@@ -10,13 +10,33 @@ const storage = multer.diskStorage({
     cb(null, Date.now() + "-" + file.originalname);
   },
 });
-const upload = multer({ storage });
+const visitorUpload = multer({ storage });
 
-router.post("/invite", inviteVisitor);
-router.post("/scan", scanQRCode);
-router.post("/exit/:id", exitVisitor);
-router.post("/capture", upload.single("image"), captureVisitor);
-router.get("/approve/:id", approveVisitor); 
-router.get("/deny/:id", denyVisitor);
+// Visitor Invitation (Resident invites visitor)
+router.post("/invite", visitorController.inviteVisitor);
+
+// Security Guard Scans QR Code
+router.post("/scan", visitorController.scanQRCode);
+
+// Security Guard Captures Image & Sends to Resident for Approval (If no QR)
+router.post("/capture", visitorUpload.single("image"), visitorController.captureVisitor);
+
+// Resident Approves Visitor Entry
+router.get("/approve/:id", visitorController.approveVisitor);
+
+// Resident Denies Visitor Entry
+router.get("/deny/:id", visitorController.denyVisitor);
+
+// Visitor Exit (Security marks visitor exit)
+router.post("/exit/:id", visitorController.exitVisitor);
+
+// Admin Panel - Get All Visitor Logs
+router.get("/logs", visitorController.getAllVisitorLogs);
+
+// Admin Panel - Get All Visitors Entry Logs (Checked-in, Granted, or Exited)
+router.get("/entry-logs", visitorController.getAllEntryLogs);
+
+// Security Guard - Get All Pending Approvals
+router.get("/pending-approvals", visitorController.getPendingApprovals);
 
 module.exports = router;

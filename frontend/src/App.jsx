@@ -17,6 +17,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import ResidentSignup from "./pages/Resident/ResidentRegister";
 import UserManagement from "./pages/Admin/UsersManagement";
 import ManageResidents from "./pages/Admin/ManageResidents";
+import AdminRoutes from "./router/AdminRoutes";
 
 function App() {
   return (
@@ -42,10 +43,7 @@ function App() {
           <Route path="/resident/*" element={<ResidentRoutes />} />
 
           {/* Admin Routes */}
-          <Route path="/admin/*">
-            <Route path="user-management" element={<UserManagement />} /> {/* ✅ Fixed */}
-            <Route path="manage-residents" element={<ManageResidents />} />
-            </Route>
+          <Route path="/admin/*" element={<AdminRoutes />} />
         </Route>
       </Routes>
       <Footer />

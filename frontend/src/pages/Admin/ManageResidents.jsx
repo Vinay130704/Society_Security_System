@@ -179,8 +179,8 @@ const ResidentManagement = () => {
       </div>
 
       {/* Residents Table */}
-      <div className="overflow-x-auto w-full flex justify-center">
-        <table className="w-full lg:w-3/4 border-collapse shadow-lg rounded-lg overflow-hidden">
+      <div className="h-full w-full overflow-scroll justify-center">
+            <table className="w-full min-w-max border-collapse shadow-lg rounded-lg table-auto text-left">
           <thead>
             <tr className="bg-primary text-white text-center">
               <th className="border p-3">Name</th>

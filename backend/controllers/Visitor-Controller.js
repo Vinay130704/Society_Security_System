@@ -211,3 +211,35 @@ exports.denyVisitor = async (req, res) => {
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };
+
+
+// Get All Visitor Logs (Admin Panel)
+exports.getAllVisitorLogs = async (req, res) => {
+  try {
+    const visitors = await Visitor.find().populate("resident_id", "name email flat_no");
+    res.status(200).json({ message: "Visitor logs fetched successfully", visitors });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// Get All Visitor Entry Logs
+exports.getAllEntryLogs = async (req, res) => {
+  try {
+    const entries = await Visitor.find({ entry_status: { $in: ["Checked In", "granted", "exit"] } })
+      .populate("resident_id", "name email flat_no");
+    res.status(200).json({ message: "Visitor entry logs fetched successfully", entries });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// Get Pending Visitor Approval Requests (Security Guard Panel)
+exports.getPendingApprovals = async (req, res) => {
+  try {
+    const pendingVisitors = await Visitor.find({ entry_status: "pending" }).populate("resident_id", "name email flat_no");
+    res.status(200).json({ message: "Pending visitor approvals fetched successfully", pendingVisitors });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};

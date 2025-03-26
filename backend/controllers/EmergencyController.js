@@ -1,5 +1,5 @@
 const EmergencyAlert = require("../models/Emergency");
-const { getIO } = require("../socket"); // Import getIO from socket.js
+const { getIO } = require("../socket"); // Import WebSocket functionality
 const { playSoundAlert } = require("../utils/soundAlert");
 
 // Create an emergency alert (Resident triggers alert)
@@ -10,7 +10,7 @@ exports.createAlert = async (req, res) => {
       return res.status(400).json({ message: "Type and location are required." });
     }
 
-    let alert = await EmergencyAlert.findOne({ type: "Unauthorized Entry" });
+    let alert = await EmergencyAlert.findOne({ type: "Unauthorized Entry", location });
 
     if (type === "Unauthorized Entry") {
       if (alert) {
@@ -42,7 +42,7 @@ exports.createAlert = async (req, res) => {
       await alert.save();
     }
 
-    // Play sound for security guard
+    // Play sound alert for security guard
     playSoundAlert();
 
     // Send WebSocket notification
@@ -57,6 +57,9 @@ exports.createAlert = async (req, res) => {
 // Get all emergency alerts (Admins & Security Guards)
 exports.getAllAlerts = async (req, res) => {
   try {
+    if (req.user.role !== "admin" && req.user.role !== "security") {
+      return res.status(403).json({ message: "Access denied." });
+    }
     const alerts = await EmergencyAlert.find().populate("residentId", "name email");
     res.json(alerts);
   } catch (error) {
@@ -77,6 +80,10 @@ exports.getResidentAlerts = async (req, res) => {
 // Update alert status (Admins & Security Guards)
 exports.updateAlertStatus = async (req, res) => {
   try {
+    if (req.user.role !== "admin" && req.user.role !== "security") {
+      return res.status(403).json({ message: "Access denied." });
+    }
+
     const { status } = req.body;
     if (!["Pending", "Processing", "Resolved"].includes(status)) {
       return res.status(400).json({ message: "Invalid status" });
@@ -98,39 +105,38 @@ exports.updateAlertStatus = async (req, res) => {
   }
 };
 
-
-
+// Security guard triggers unauthorized entry alert
 let unauthorizedEntryCount = {};
 
 exports.triggerUnauthorizedEntry = async (req, res) => {
-    try {
-      const { location } = req.body;
-  
-      if (!location) {
-        return res.status(400).json({ message: "Location is required." });
-      }
-  
-      const key = `${req.user.userId}-${location}`;
-      unauthorizedEntryCount[key] = (unauthorizedEntryCount[key] || 0) + 1;
-  
-      if (unauthorizedEntryCount[key] >= 3) {
-        const autoAlert = new EmergencyAlert({
-          residentId: req.user.userId,
-          type: "Unauthorized Entry",
-          location,
-          description: "Repeated unauthorized entry detected!",
-        });
-  
-        await autoAlert.save();
-  
-        io.emit("emergencyAlert", autoAlert);
-        playAlertSound();
-  
-        return res.json({ message: "Multiple unauthorized entries detected! Security has been alerted.", autoAlert });
-      }
-  
-      res.json({ message: `Unauthorized entry detected at ${location}. Count: ${unauthorizedEntryCount[key]}` });
-    } catch (error) {
-      res.status(500).json({ message: "Server Error", error });
+  try {
+    const { location } = req.body;
+
+    if (!location) {
+      return res.status(400).json({ message: "Location is required." });
     }
-  };
+
+    const key = `${req.user.userId}-${location}`;
+    unauthorizedEntryCount[key] = (unauthorizedEntryCount[key] || 0) + 1;
+
+    if (unauthorizedEntryCount[key] >= 3) {
+      const autoAlert = new EmergencyAlert({
+        residentId: req.user.userId,
+        type: "Unauthorized Entry",
+        location,
+        description: "Repeated unauthorized entry detected!",
+      });
+
+      await autoAlert.save();
+
+      getIO().emit("emergencyAlert", autoAlert);
+      playSoundAlert();
+
+      return res.json({ message: "Multiple unauthorized entries detected! Security has been alerted.", autoAlert });
+    }
+
+    res.json({ message: `Unauthorized entry detected at ${location}. Count: ${unauthorizedEntryCount[key]}` });
+  } catch (error) {
+    res.status(500).json({ message: "Server Error", error });
+  }
+};

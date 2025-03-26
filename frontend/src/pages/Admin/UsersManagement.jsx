@@ -62,7 +62,7 @@ const ManageUser = () => {
       const response = await axios.put(
         `http://localhost:5000/api/admin/approve/${userId}`,
         {},
-        { 
+        {
           headers: { Authorization: `Bearer ${token}` },
           timeout: 5000
         }
@@ -113,7 +113,7 @@ const ManageUser = () => {
       const response = await axios.put(
         `http://localhost:5000/api/admin/reject/${selectedRejectId}`,
         { remark: rejectRemark },
-        { 
+        {
           headers: { Authorization: `Bearer ${token}` },
           timeout: 5000
         }
@@ -169,7 +169,7 @@ const ManageUser = () => {
   };
 
   return (
-    <div className="p-10 m-10 min-h-screen flex flex-col items-center bg-background">
+    <div className="p-10 m-10 min-h-screen flex flex-col items-center ">
       <h2 className="text-2xl font-bold mb-6 text-primary text-center">Manage Users</h2>
       {error && <p className="text-red-500 text-center">{error}</p>}
 
@@ -193,8 +193,8 @@ const ManageUser = () => {
       ) : (
         <>
           {/* Table */}
-          <div className="overflow-x-auto w-full flex justify-center">
-            <table className="w-full lg:w-3/4 border-collapse shadow-lg rounded-lg overflow-hidden">
+          <div className="h-full w-full overflow-scroll justify-center">
+            <table className="w-full min-w-max border-collapse shadow-lg rounded-lg table-auto text-left">
               <thead>
                 <tr className="bg-primary text-white text-center">
                   <th className="border border-background p-3">Name</th>
@@ -211,17 +211,16 @@ const ManageUser = () => {
                     <tr key={resident._id} className="border border-background text-center bg-white hover:bg-gray-100">
                       <td className="border border-background p-3 capitalize text-text">{resident.name || "N/A"}</td>
                       <td className="border border-background p-3 text-text">{resident.email || "N/A"}</td>
-                      <td className="border border-background p-3 text-text">{resident.role || "N/A"}</td>
-                      <td className="border border-background p-3 text-text">{resident.flat_no || "N/A"}</td>
-                      <td className="border border-background p-3">
+                      <td className="border border-background p-3 capitalize text-text">{resident.role || "N/A"}</td>
+                      <td className="border border-background p-3 capitalize text-text">{resident.flat_no || "N/A"}</td>
+                      <td className="border border-background p-3 capitalize">
                         <span
-                          className={`font-bold ${
-                            resident.approval_status === "approved"
-                              ? "text-green-600"
-                              : resident.approval_status === "rejected"
+                          className={`font-bold ${resident.approval_status === "approved"
+                            ? "text-green-600"
+                            : resident.approval_status === "rejected"
                               ? "text-red-600"
                               : "text-yellow-600"
-                          }`}
+                            }`}
                         >
                           {resident.approval_status}
                         </span>
@@ -289,9 +288,8 @@ const ManageUser = () => {
             <button
               onClick={() => paginate(currentPage - 1)}
               disabled={currentPage === 1}
-              className={`px-4 py-2 rounded ${
-                currentPage === 1 ? "bg-gray-400 cursor-not-allowed" : "bg-gray-300"
-              } text-text`}
+              className={`px-4 py-2 rounded ${currentPage === 1 ? "bg-gray-400 cursor-not-allowed" : "bg-gray-300"
+                } text-text`}
             >
               Previous
             </button>
@@ -300,9 +298,8 @@ const ManageUser = () => {
               <button
                 key={num + 1}
                 onClick={() => paginate(num + 1)}
-                className={`px-4 py-2 rounded ${
-                  currentPage === num + 1 ? "bg-primary text-white" : "bg-gray-300 text-text"
-                }`}
+                className={`px-4 py-2 rounded ${currentPage === num + 1 ? "bg-primary text-white" : "bg-gray-300 text-text"
+                  }`}
               >
                 {num + 1}
               </button>
@@ -311,11 +308,10 @@ const ManageUser = () => {
             <button
               onClick={() => paginate(currentPage + 1)}
               disabled={indexOfLastItem >= filteredResidents.length}
-              className={`px-4 py-2 rounded ${
-                indexOfLastItem >= filteredResidents.length
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-gray-300"
-              } text-text`}
+              className={`px-4 py-2 rounded ${indexOfLastItem >= filteredResidents.length
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-gray-300"
+                } text-text`}
             >
               Next
             </button>
