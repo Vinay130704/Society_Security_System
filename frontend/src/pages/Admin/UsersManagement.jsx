@@ -25,9 +25,10 @@ const ManageUser = () => {
 
         const response = await axios.get("http://localhost:5000/api/admin/users", {
           headers: { Authorization: `Bearer ${token}` },
+          timeout: 5000
         });
 
-        if (response.data?.users) {
+        if (response.data?.success && response.data.users) {
           setResidents(response.data.users);
         } else {
           throw new Error("Invalid response format");
@@ -45,21 +46,47 @@ const ManageUser = () => {
   }, []);
 
   const approveUser = async (userId) => {
+    const toastId = toast.loading("Approving user..."); // Show loading toast
     try {
       const token = localStorage.getItem("token");
+      if (!token) {
+        toast.update(toastId, {
+          render: "Unauthorized: Token missing!",
+          type: "error",
+          isLoading: false,
+          autoClose: 3000
+        });
+        return;
+      }
+
       const response = await axios.put(
         `http://localhost:5000/api/admin/approve/${userId}`,
         {},
-        { headers: { Authorization: `Bearer ${token}` } }
+        { 
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 5000
+        }
       );
-      toast.success(response.data.message);
+
+      toast.update(toastId, {
+        render: response.data.message,
+        type: "success",
+        isLoading: false,
+        autoClose: 3000
+      });
+
       setResidents((prev) =>
         prev.map((resident) =>
           resident._id === userId ? { ...resident, approval_status: "approved" } : resident
         )
       );
     } catch (err) {
-      toast.error("Approval failed. Try again.");
+      toast.update(toastId, {
+        render: err.response?.data?.message || "Approval failed. Try again.",
+        type: "error",
+        isLoading: false,
+        autoClose: 3000
+      });
       console.error("Approval error:", err);
     }
   };
@@ -69,14 +96,36 @@ const ManageUser = () => {
       toast.warn("Please enter a remark for rejection.");
       return;
     }
+
+    const toastId = toast.loading("Rejecting user..."); // Show loading toast
     try {
       const token = localStorage.getItem("token");
+      if (!token) {
+        toast.update(toastId, {
+          render: "Unauthorized: Token missing!",
+          type: "error",
+          isLoading: false,
+          autoClose: 3000
+        });
+        return;
+      }
+
       const response = await axios.put(
         `http://localhost:5000/api/admin/reject/${selectedRejectId}`,
         { remark: rejectRemark },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { 
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 5000
+        }
       );
-      toast.success(response.data.message);
+
+      toast.update(toastId, {
+        render: response.data.message,
+        type: "success",
+        isLoading: false,
+        autoClose: 3000
+      });
+
       setResidents((prev) =>
         prev.map((resident) =>
           resident._id === selectedRejectId
@@ -84,10 +133,16 @@ const ManageUser = () => {
             : resident
         )
       );
+
       setRejectRemark("");
       setSelectedRejectId(null);
     } catch (err) {
-      toast.error("Rejection failed. Try again.");
+      toast.update(toastId, {
+        render: err.response?.data?.message || "Rejection failed. Try again.",
+        type: "error",
+        isLoading: false,
+        autoClose: 3000
+      });
       console.error("Rejection error:", err);
     }
   };
@@ -96,6 +151,7 @@ const ManageUser = () => {
   const filteredResidents = residents.filter((resident) =>
     Object.values(resident).some(
       (value) =>
+        value &&
         typeof value === "string" &&
         value.toLowerCase().includes(searchQuery.toLowerCase())
     )
@@ -113,7 +169,7 @@ const ManageUser = () => {
   };
 
   return (
-    <div className="p-10 m-10 min-h-screen flex flex-col items-center">
+    <div className="p-10 m-10 min-h-screen flex flex-col items-center bg-background">
       <h2 className="text-2xl font-bold mb-6 text-primary text-center">Manage Users</h2>
       {error && <p className="text-red-500 text-center">{error}</p>}
 
@@ -125,15 +181,15 @@ const ManageUser = () => {
             placeholder="Search User"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="border p-3 w-full rounded-full shadow-md pl-10 focus:outline-none focus:ring-2 focus:ring-secondary"
+            className="border p-3 w-full rounded-full shadow-md pl-10 focus:outline-none focus:ring-2 focus:ring-secondary text-text"
           />
-          <FaSearch className="absolute left-3 top-4 text-gray-500" />
+          <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" />
         </div>
       </div>
 
       {/* Loading State */}
       {loading ? (
-        <p className="text-gray-600">Loading users...</p>
+        <p className="text-text">Loading users...</p>
       ) : (
         <>
           {/* Table */}
@@ -141,23 +197,23 @@ const ManageUser = () => {
             <table className="w-full lg:w-3/4 border-collapse shadow-lg rounded-lg overflow-hidden">
               <thead>
                 <tr className="bg-primary text-white text-center">
-                  <th className="border p-3">Name</th>
-                  <th className="border p-3">Email</th>
-                  <th className="border p-3">Role</th>
-                  <th className="border p-3">Flat No</th>
-                  <th className="border p-3">Approval Status</th>
-                  <th className="border p-3">Action</th>
+                  <th className="border border-background p-3">Name</th>
+                  <th className="border border-background p-3">Email</th>
+                  <th className="border border-background p-3">Role</th>
+                  <th className="border border-background p-3">Flat No</th>
+                  <th className="border border-background p-3">Approval Status</th>
+                  <th className="border border-background p-3">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {currentResidents.length > 0 ? (
                   currentResidents.map((resident) => (
-                    <tr key={resident._id} className="border text-center bg-white hover:bg-gray-100">
-                      <td className="border p-3 capitalize">{resident.name || "N/A"}</td>
-                      <td className="border p-3">{resident.email || "N/A"}</td>
-                      <td className="border p-3">{resident.role || "N/A"}</td>
-                      <td className="border p-3">{resident.flat_no || "N/A"}</td>
-                      <td className="border p-3">
+                    <tr key={resident._id} className="border border-background text-center bg-white hover:bg-gray-100">
+                      <td className="border border-background p-3 capitalize text-text">{resident.name || "N/A"}</td>
+                      <td className="border border-background p-3 text-text">{resident.email || "N/A"}</td>
+                      <td className="border border-background p-3 text-text">{resident.role || "N/A"}</td>
+                      <td className="border border-background p-3 text-text">{resident.flat_no || "N/A"}</td>
+                      <td className="border border-background p-3">
                         <span
                           className={`font-bold ${
                             resident.approval_status === "approved"
@@ -185,6 +241,33 @@ const ManageUser = () => {
                             >
                               Reject
                             </button>
+                            {selectedRejectId === resident._id && (
+                              <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+                                <div className="bg-white p-6 rounded-lg shadow-lg">
+                                  <h3 className="text-lg font-bold mb-2 text-text">Enter Rejection Remark</h3>
+                                  <textarea
+                                    className="w-full p-2 border rounded text-text"
+                                    placeholder="Enter reason for rejection"
+                                    value={rejectRemark}
+                                    onChange={(e) => setRejectRemark(e.target.value)}
+                                  />
+                                  <div className="flex justify-end mt-3 gap-2">
+                                    <button
+                                      onClick={() => setSelectedRejectId(null)}
+                                      className="bg-gray-500 text-white px-4 py-2 rounded"
+                                    >
+                                      Cancel
+                                    </button>
+                                    <button
+                                      onClick={rejectUser}
+                                      className="bg-red-600 text-white px-4 py-2 rounded"
+                                    >
+                                      Reject
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                           </>
                         )}
                       </td>
@@ -192,7 +275,7 @@ const ManageUser = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="6" className="text-center border p-3 text-gray-500">
+                    <td colSpan="6" className="text-center border border-background p-3 text-text">
                       No residents found
                     </td>
                   </tr>
@@ -203,10 +286,37 @@ const ManageUser = () => {
 
           {/* Pagination */}
           <div className="flex justify-center mt-4 gap-4">
-            <button onClick={() => paginate(currentPage - 1)} disabled={currentPage === 1} className="bg-gray-300 px-4 py-2 rounded">
+            <button
+              onClick={() => paginate(currentPage - 1)}
+              disabled={currentPage === 1}
+              className={`px-4 py-2 rounded ${
+                currentPage === 1 ? "bg-gray-400 cursor-not-allowed" : "bg-gray-300"
+              } text-text`}
+            >
               Previous
             </button>
-            <button onClick={() => paginate(currentPage + 1)} disabled={indexOfLastItem >= filteredResidents.length} className="bg-gray-300 px-4 py-2 rounded">
+
+            {[...Array(Math.ceil(filteredResidents.length / itemsPerPage)).keys()].map((num) => (
+              <button
+                key={num + 1}
+                onClick={() => paginate(num + 1)}
+                className={`px-4 py-2 rounded ${
+                  currentPage === num + 1 ? "bg-primary text-white" : "bg-gray-300 text-text"
+                }`}
+              >
+                {num + 1}
+              </button>
+            ))}
+
+            <button
+              onClick={() => paginate(currentPage + 1)}
+              disabled={indexOfLastItem >= filteredResidents.length}
+              className={`px-4 py-2 rounded ${
+                indexOfLastItem >= filteredResidents.length
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-gray-300"
+              } text-text`}
+            >
               Next
             </button>
           </div>

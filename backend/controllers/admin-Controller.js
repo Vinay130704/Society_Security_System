@@ -3,8 +3,7 @@ const User = require("../models/User");
 const sendEmail = require("../utils/sendEmail");
 const bcrypt = require("bcrypt");
 
-// Approve a user
-const approveUser = async (req, res) => {
+exports.approveUser = async (req, res) => {
   try {
     const { userId } = req.params;
 
@@ -18,10 +17,9 @@ const approveUser = async (req, res) => {
     }
 
     if (!user.email) {
-      return res.status(400).json({ message: "User email is missing. Cannot send approval email." });
+      return res.status(400).json({ message: "User email is missing." });
     }
 
-    // Generate a temporary password
     const tempPassword = Math.random().toString(36).slice(-6);
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
@@ -47,17 +45,16 @@ const approveUser = async (req, res) => {
       await sendEmail(emailOptions);
       res.status(200).json({ message: "User approved successfully and email sent." });
     } catch (emailError) {
+      console.error("Email error:", emailError);
       res.status(500).json({ message: "User approved, but email sending failed.", error: emailError.message });
     }
-
   } catch (err) {
     console.error("Error approving user:", err);
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };
 
-// Reject a user
-const rejectUser = async (req, res) => {
+exports.rejectUser = async (req, res) => {
   try {
     const { userId } = req.params;
     const { remark } = req.body;
@@ -96,28 +93,18 @@ const rejectUser = async (req, res) => {
       await sendEmail(emailOptions);
       res.status(200).json({ message: "User rejected successfully and email sent." });
     } catch (emailError) {
+      console.error("Email error:", emailError);
       res.status(500).json({ message: "User rejected, but email sending failed.", error: emailError.message });
     }
-
   } catch (err) {
     console.error("Error rejecting user:", err);
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };
 
-// Get  users (Admin Only)
-const getUsers = async (req, res) => {
+exports.getUsers = async (req, res) => {
   try {
-    console.log("🔹 getUsers function executed!");
-
-    if (!req.user || req.user.role !== "admin") {
-      console.log("Unauthorized Access Attempt");
-      return res.status(403).json({ error: "Unauthorized access" });
-    }
-
     const users = await User.find().select("name email role flat_no approval_status remark");
-    console.log("Users Fetched Successfully", users);
-
     res.status(200).json({ success: true, users });
   } catch (error) {
     console.error("Error fetching users:", error);
@@ -126,27 +113,48 @@ const getUsers = async (req, res) => {
 };
 
 
+
+
 // Update user profile (Fixed name)
-const updateUserProfile = async (req, res) => {
+exports.updateUser = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, email, phone } = req.body;
 
-    const updateFields = { name, email, phone };
-    const updatedUser = await User.findByIdAndUpdate(id, updateFields, { new: true });
+    // Validate request data
+    if (!id) {
+      return res.status(400).json({ error: "User ID is required" });
+    }
+
+    if (!name && !email && !phone) {
+      return res.status(400).json({ error: "At least one field (name, email, or phone) is required for update" });
+    }
+
+    // Prepare update fields dynamically
+    const updateFields = {};
+    if (name) updateFields.name = name;
+    if (email) updateFields.email = email;
+    if (phone) updateFields.phone = phone;
+
+    // Find and update user
+    const updatedUser = await User.findByIdAndUpdate(id, updateFields, { new: true, runValidators: true });
 
     if (!updatedUser) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    res.status(200).json({ message: "User profile updated successfully", updatedUser });
+    res.status(200).json({ message: "User profile updated successfully", user: updatedUser });
   } catch (error) {
-    res.status(500).json({ error: "Failed to update user profile" });
+    console.error("Update error:", error);
+    res.status(500).json({ error: "Failed to update user profile", details: error.message });
   }
 };
 
+
+
+
 // Remove a resident
-const removeResident = async (req, res) => {
+exports.removeResident = async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -161,10 +169,6 @@ const removeResident = async (req, res) => {
   }
 };
 
-
-
-
-module.exports = { approveUser, rejectUser, getUsers, updateUserProfile, removeResident };
 
 
 

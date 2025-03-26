@@ -30,7 +30,7 @@ exports.registerStaff = async (req, res) => {
 };
 
 
-// ✅ 2. Get All Staff Members of a Resident
+// 2. Get All Staff Members of a Resident
 exports.getResidentStaff = async (req, res) => {
     try {
         const { residentId } = req.params;
@@ -41,13 +41,22 @@ exports.getResidentStaff = async (req, res) => {
     }
 };
 
-// ✅ 3. Block a Staff Member with Remark
+// 3. Block a Staff Member with Remark
 exports.blockStaff = async (req, res) => {
     try {
         const { staffId } = req.params;
         const { remark } = req.body;
 
-        const staff = await Staff.findByIdAndUpdate(staffId, { status: "blocked", blockRemark: remark }, { new: true });
+        if (!remark) {
+            return res.status(400).json({ message: "Block remark is required." });
+        }
+
+        const staff = await Staff.findByIdAndUpdate(
+            staffId, 
+            { status: "blocked", blockRemark: remark }, 
+            { new: true }
+        );
+
         if (!staff) return res.status(404).json({ message: "Staff not found." });
 
         res.json({ message: "Staff blocked successfully.", staff });
@@ -56,21 +65,31 @@ exports.blockStaff = async (req, res) => {
     }
 };
 
-// ✅ 4. Unblock a Staff Member
+// 4. Unblock a Staff Member (Set status to "active")
 exports.unblockStaff = async (req, res) => {
     try {
         const { staffId } = req.params;
 
-        const staff = await Staff.findByIdAndUpdate(staffId, { status: "active", blockRemark: "" }, { new: true });
+        const staff = await Staff.findById(staffId);
         if (!staff) return res.status(404).json({ message: "Staff not found." });
 
-        res.json({ message: "Staff unblocked successfully.", staff });
+        if (staff.status !== "blocked") {
+            return res.status(400).json({ message: "Staff is not blocked." });
+        }
+
+        // Update status to "active" and remove the remark
+        staff.status = "active";
+        staff.blockRemark = "";
+        await staff.save();
+
+        res.json({ message: "Staff activated successfully.", staff });
     } catch (error) {
-        res.status(500).json({ message: "Error unblocking staff", error: error.message });
+        res.status(500).json({ message: "Error activating staff", error: error.message });
     }
 };
 
-// ✅ 5. Delete Staff (Cancel Permanent ID)
+
+// 5. Delete Staff (Cancel Permanent ID)
 exports.deleteStaff = async (req, res) => {
     try {
         const { staffId } = req.params;
@@ -83,7 +102,7 @@ exports.deleteStaff = async (req, res) => {
     }
 };
 
-// ✅ 6. Verify Permanent ID (For Security Guard Entry)
+// 6. Verify Permanent ID (For Security Guard Entry)
 exports.verifyPermanentId = async (req, res) => {
     try {
         const { permanentId, securityGuardId } = req.params;
@@ -118,7 +137,7 @@ exports.verifyPermanentId = async (req, res) => {
     }
 };
 
-// ✅ 7. Staff Entry (Security Guard must be logged in)
+// 7. Staff Entry (Security Guard must be logged in)
 exports.staffEntry = async (req, res) => {
   try {
       const { permanentId } = req.body;
@@ -146,7 +165,7 @@ exports.staffEntry = async (req, res) => {
   }
 };
 
-// ✅ 8. Staff Exit (Security Guard must be logged in)
+// 8. Staff Exit (Security Guard must be logged in)
 exports.staffExit = async (req, res) => {
   try {
       const { permanentId } = req.body;
@@ -176,7 +195,7 @@ exports.staffExit = async (req, res) => {
 };
 
 
-// ✅ 9. Get Complete Entry-Exit History for a Staff Member
+// 9. Get Complete Entry-Exit History for a Staff Member
 exports.getStaffHistory = async (req, res) => {
     try {
         const { permanentId } = req.params;
