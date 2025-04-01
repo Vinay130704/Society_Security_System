@@ -1,30 +1,22 @@
 const express = require("express");
 const router = express.Router();
+const { authMiddleware } = require("../middleware/authMiddleware");
 const staffController = require("../controllers/Staff-Controller");
 
-// ✅ Register Staff
-router.post("/add-staff", staffController.registerStaff);
+// Resident-only routes
+router.post("/add-staff", authMiddleware,  staffController.registerStaff);
+router.get("/resident/:residentId", authMiddleware,  staffController.getResidentStaff);
 
-// ✅ Get All Staff Members of a Resident
-router.get("/resident/:residentId", staffController.getResidentStaff);
+// Admin-only routes
+router.put("/block/:staffId", authMiddleware,  staffController.blockStaff);
+router.put("/unblock/:staffId", authMiddleware,  staffController.unblockStaff);
+router.delete("/delete/:staffId", authMiddleware,  staffController.deleteStaff);
 
-// ✅ Block Staff Member
-router.put("/block/:staffId", staffController.blockStaff);
+// Security-only routes
+router.post("/entry", authMiddleware,  staffController.staffEntry);
+router.post("/exit", authMiddleware,  staffController.staffExit);
 
-// ✅ Unblock Staff Member
-router.put("/unblock/:staffId", staffController.unblockStaff);
-
-// ✅ Delete Staff Member (Cancel Permanent ID)
-router.delete("/delete/:staffId", staffController.deleteStaff);
-
-
-// ✅ Staff Entry Check (Security Guard)
-router.post("/entry", staffController.staffEntry);
-
-// ✅ Staff Exit Check (Security Guard)
-router.post("/exit", staffController.staffExit);
-
-// ✅ Get Staff Entry-Exit History
-router.get("/history/:permanentId", staffController.getStaffHistory);
+// Shared routes (accessible by multiple roles)
+router.get("/history/:permanentId", authMiddleware, staffController.getStaffHistory);
 
 module.exports = router;

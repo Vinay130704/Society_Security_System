@@ -3,26 +3,31 @@ const fs = require("fs");
 const path = require("path");
 
 const generateQRCode = async (data) => {
-    try {
-        // Define the directory for storing QR codes
-        const qrDir = path.join(__dirname, "../uploads/qrcodes");
-        
-        // Ensure the directory exists
-        if (!fs.existsSync(qrDir)) {
-            fs.mkdirSync(qrDir, { recursive: true });
-        }
-
-        // Generate QR code file path
-        const qrPath = path.join(qrDir, `${data}.png`);
-
-        // Generate QR Code and save to file
-        await QRCode.toFile(qrPath, data);
-
-        return qrPath;  // Return the saved file path
-    } catch (error) {
-        console.error("QR Code Generation Failed:", error);
-        return null;
+  try {
+    const qrDir = path.join(__dirname, "../uploads/qrcodes");
+    
+    // Ensure directory exists
+    if (!fs.existsSync(qrDir)) {
+      fs.mkdirSync(qrDir, { recursive: true });
     }
+
+    const qrPath = path.join(qrDir, `${data}.png`);
+    const qrUrl = await QRCode.toFile(qrPath, data, {
+      errorCorrectionLevel: 'H',
+      margin: 2,
+      width: 300,
+      color: {
+        dark: '#000000',
+        light: '#ffffff'
+      }
+    });
+
+    return data; // Return the QR data (not path) for storage in DB
+
+  } catch (error) {
+    console.error("QR generation error:", error);
+    throw new Error("Failed to generate QR code");
+  }
 };
 
 module.exports = generateQRCode;

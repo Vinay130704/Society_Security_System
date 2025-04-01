@@ -15,8 +15,6 @@ import SecurityRoutes from "./router/SecurityRoutes";
 import ChangePassword from "./pages/ResetPassword";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ResidentSignup from "./pages/Resident/ResidentRegister";
-import UserManagement from "./pages/Admin/UsersManagement";
-import ManageResidents from "./pages/Admin/ManageResidents";
 import AdminRoutes from "./router/AdminRoutes";
 
 function App() {
@@ -41,8 +39,6 @@ function App() {
         <Route element={<ProtectedRoute />}>
           <Route path="/security/*" element={<SecurityRoutes />} />
           <Route path="/resident/*" element={<ResidentRoutes />} />
-
-          {/* Admin Routes */}
           <Route path="/admin/*" element={<AdminRoutes />} />
         </Route>
       </Routes>

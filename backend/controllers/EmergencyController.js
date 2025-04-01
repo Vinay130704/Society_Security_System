@@ -1,52 +1,65 @@
 const EmergencyAlert = require("../models/Emergency");
-const { getIO } = require("../socket"); // Import WebSocket functionality
+const { getIO } = require("../socket");
 const { playSoundAlert } = require("../utils/soundAlert");
 
-// Create an emergency alert (Resident triggers alert)
+// Resident creates emergency alert
 exports.createAlert = async (req, res) => {
   try {
     const { type, customTitle, location, description, photo } = req.body;
+    
+    // Validation
     if (!type || !location) {
-      return res.status(400).json({ message: "Type and location are required." });
+      return res.status(400).json({ message: "Type and location are required" });
     }
 
-    let alert = await EmergencyAlert.findOne({ type: "Unauthorized Entry", location });
+    if (type === "Other" && !customTitle) {
+      return res.status(400).json({ message: "Custom title is required for 'Other' type" });
+    }
 
+    // Handle unauthorized entry tracking
     if (type === "Unauthorized Entry") {
-      if (alert) {
-        alert.repeatedAttempts += 1;
-        if (alert.repeatedAttempts >= 3) {
-          getIO().emit("emergencyAlert", { message: "Multiple unauthorized entries detected!" });
-        }
-        await alert.save();
-      } else {
-        alert = new EmergencyAlert({
-          residentId: req.user.userId,
-          type,
-          location,
-          description,
-          photo,
-          repeatedAttempts: 1,
-        });
-        await alert.save();
-      }
-    } else {
-      alert = new EmergencyAlert({
-        residentId: req.user.userId,
-        type,
-        customTitle: type === "Other" ? customTitle : null,
+      const existingAlert = await EmergencyAlert.findOne({ 
+        type: "Unauthorized Entry", 
         location,
-        description,
-        photo,
+        status: "Pending"
       });
-      await alert.save();
+
+      if (existingAlert) {
+        existingAlert.repeatedAttempts += 1;
+        existingAlert.description = description || existingAlert.description;
+        await existingAlert.save();
+
+        if (existingAlert.repeatedAttempts >= 3) {
+          getIO().emit("emergencyAlert", { 
+            message: "Multiple unauthorized entries detected!",
+            alert: existingAlert
+          });
+        }
+        return res.status(201).json(existingAlert);
+      }
     }
 
-    // Play sound alert for security guard
-    playSoundAlert();
+    // Create new alert
+    const alert = new EmergencyAlert({
+      residentId: req.user.userId,
+      type,
+      customTitle: type === "Other" ? customTitle : undefined,
+      location,
+      description,
+      photo,
+      status: "Pending"
+    });
 
-    // Send WebSocket notification
-    getIO().emit("emergencyAlert", { type, location, description });
+    await alert.save();
+
+    // Notify security and admin via WebSocket
+    getIO().emit("emergencyAlert", {
+      message: "New emergency alert!",
+      alert
+    });
+
+    // Play alert sound
+    playSoundAlert();
 
     res.status(201).json(alert);
   } catch (error) {
@@ -54,13 +67,17 @@ exports.createAlert = async (req, res) => {
   }
 };
 
-// Get all emergency alerts (Admins & Security Guards)
+// Get all alerts (Admin/Security only)
 exports.getAllAlerts = async (req, res) => {
   try {
     if (req.user.role !== "admin" && req.user.role !== "security") {
-      return res.status(403).json({ message: "Access denied." });
+      return res.status(403).json({ message: "Access denied" });
     }
-    const alerts = await EmergencyAlert.find().populate("residentId", "name email");
+
+    const alerts = await EmergencyAlert.find()
+      .populate("residentId", "name email phone flat_no")
+      .sort({ createdAt: -1 });
+
     res.json(alerts);
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
@@ -69,19 +86,25 @@ exports.getAllAlerts = async (req, res) => {
 
 // Get resident's own alerts
 exports.getResidentAlerts = async (req, res) => {
+  console.log("getResidentAlerts triggered"); // Add this line
   try {
-    const alerts = await EmergencyAlert.find({ residentId: req.user.userId });
+    const alerts = await EmergencyAlert.find({ residentId: req.user.userId })
+      .sort({ createdAt: -1 });
+    
+    console.log("Found alerts:", alerts); // Debug output
+    
     res.json(alerts);
   } catch (error) {
+    console.error("Error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
-// Update alert status (Admins & Security Guards)
+// Update alert status (Admin/Security only)
 exports.updateAlertStatus = async (req, res) => {
   try {
     if (req.user.role !== "admin" && req.user.role !== "security") {
-      return res.status(403).json({ message: "Access denied." });
+      return res.status(403).json({ message: "Access denied" });
     }
 
     const { status } = req.body;
@@ -93,11 +116,17 @@ exports.updateAlertStatus = async (req, res) => {
       req.params.id,
       { status },
       { new: true }
-    );
+    ).populate("residentId", "name email");
 
     if (!alert) {
       return res.status(404).json({ message: "Alert not found" });
     }
+
+    // Notify resident of status change
+    getIO().to(`user_${alert.residentId._id}`).emit("alertUpdate", {
+      message: `Your alert status has been updated to ${status}`,
+      alert
+    });
 
     res.json(alert);
   } catch (error) {
@@ -105,38 +134,35 @@ exports.updateAlertStatus = async (req, res) => {
   }
 };
 
-// Security guard triggers unauthorized entry alert
-let unauthorizedEntryCount = {};
-
+// Security triggers unauthorized entry alert
 exports.triggerUnauthorizedEntry = async (req, res) => {
   try {
-    const { location } = req.body;
+    const { location, description } = req.body;
 
     if (!location) {
-      return res.status(400).json({ message: "Location is required." });
+      return res.status(400).json({ message: "Location is required" });
     }
 
-    const key = `${req.user.userId}-${location}`;
-    unauthorizedEntryCount[key] = (unauthorizedEntryCount[key] || 0) + 1;
+    const alert = new EmergencyAlert({
+      residentId: req.user.userId,
+      type: "Unauthorized Entry",
+      location,
+      description: description || "Security reported unauthorized entry",
+      status: "Pending"
+    });
 
-    if (unauthorizedEntryCount[key] >= 3) {
-      const autoAlert = new EmergencyAlert({
-        residentId: req.user.userId,
-        type: "Unauthorized Entry",
-        location,
-        description: "Repeated unauthorized entry detected!",
-      });
+    await alert.save();
 
-      await autoAlert.save();
+    // Notify admin
+    getIO().emit("emergencyAlert", {
+      message: "Unauthorized entry detected!",
+      alert
+    });
 
-      getIO().emit("emergencyAlert", autoAlert);
-      playSoundAlert();
+    playSoundAlert();
 
-      return res.json({ message: "Multiple unauthorized entries detected! Security has been alerted.", autoAlert });
-    }
-
-    res.json({ message: `Unauthorized entry detected at ${location}. Count: ${unauthorizedEntryCount[key]}` });
+    res.status(201).json(alert);
   } catch (error) {
-    res.status(500).json({ message: "Server Error", error });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };

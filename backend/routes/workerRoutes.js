@@ -1,17 +1,21 @@
 const express = require("express");
 const router = express.Router();
+const { authMiddleware } = require("../middleware/authMiddleware");
 const workerController = require("../controllers/workerController");
 
-router.post("/add-worker", workerController.registerWorker);
-router.get("/workers", workerController.getAllWorkers);
-router.get("/worker/:permanentId", workerController.getWorkerById);
-router.patch("/block/:permanentId", workerController.blockWorker);
-router.patch("/unblock/:permanentId", workerController.unblockWorker);
-router.patch("/cancel/:permanentId", workerController.cancelWorker);
+// Admin-only routes
+router.post("/add-worker", authMiddleware,  workerController.registerWorker);
+router.patch("/block/:permanentId", authMiddleware,  workerController.blockWorker);
+router.patch("/unblock/:permanentId", authMiddleware,  workerController.unblockWorker);
+router.patch("/cancel/:permanentId", authMiddleware,  workerController.cancelWorker);
 
-// ✅ Security Guard Routes
-router.post("/entry/:permanentId", workerController.allowEntry);
-router.post("/exit/:permanentId", workerController.allowExit);
-router.get("/logs/:permanentId", workerController.getWorkerLogs);
+// Security-only routes
+router.post("/entry/:permanentId", authMiddleware,  workerController.allowEntry);
+router.post("/exit/:permanentId", authMiddleware,  workerController.allowExit);
+
+// Shared authenticated routes
+router.get("/workers", authMiddleware, workerController.getAllWorkers);
+router.get("/worker/:permanentId", authMiddleware, workerController.getWorkerById);
+router.get("/logs/:permanentId", authMiddleware, workerController.getWorkerLogs);
 
 module.exports = router;

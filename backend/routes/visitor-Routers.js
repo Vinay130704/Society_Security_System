@@ -1,42 +1,49 @@
 const express = require("express");
-const multer = require("multer");
 const router = express.Router();
 const visitorController = require("../controllers/Visitor-Controller");
+const { authMiddleware } = require("../middleware/authMiddleware");
+const multer = require("multer");
 
-// File Upload Configuration for Visitor Images
+// Configure multer for file uploads
 const storage = multer.diskStorage({
-  destination: "./uploads/visitor_images/",
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + "-" + file.originalname);
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/visitor_images/');
   },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + '-' + file.originalname);
+  }
 });
-const visitorUpload = multer({ storage });
 
-// Visitor Invitation (Resident invites visitor)
-router.post("/invite", visitorController.inviteVisitor);
+const upload = multer({ 
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed!'), false);
+    }
+  }
+});
 
-// Security Guard Scans QR Code
-router.post("/scan", visitorController.scanQRCode);
+// Resident routes
+router.post("/invite", authMiddleware, visitorController.inviteVisitor);
+router.get("/approve/:id", authMiddleware, visitorController.approveVisitor);
+router.get("/deny/:id", authMiddleware, visitorController.denyVisitor);
 
-// Security Guard Captures Image & Sends to Resident for Approval (If no QR)
-router.post("/capture", visitorUpload.single("image"), visitorController.captureVisitor);
+// Security routes
+router.post("/scan", authMiddleware, visitorController.scanQRCode);
+router.post("/capture", upload.single('image'), visitorController.captureVisitor);
+router.post("/exit/:id", authMiddleware, visitorController.exitVisitor);
 
-// Resident Approves Visitor Entry
-router.get("/approve/:id", visitorController.approveVisitor);
+// Admin/Reporting routes
+router.get("/logs", authMiddleware, visitorController.getAllVisitorLogs);
+router.get("/entry-logs", authMiddleware, visitorController.getAllEntryLogs);
+router.get("/pending-approvals", authMiddleware, visitorController.getPendingApprovals);
 
-// Resident Denies Visitor Entry
-router.get("/deny/:id", visitorController.denyVisitor);
-
-// Visitor Exit (Security marks visitor exit)
-router.post("/exit/:id", visitorController.exitVisitor);
-
-// Admin Panel - Get All Visitor Logs
-router.get("/logs", visitorController.getAllVisitorLogs);
-
-// Admin Panel - Get All Visitors Entry Logs (Checked-in, Granted, or Exited)
-router.get("/entry-logs", visitorController.getAllEntryLogs);
-
-// Security Guard - Get All Pending Approvals
-router.get("/pending-approvals", visitorController.getPendingApprovals);
+// Public routes
+router.get("/qr/:qr_data", visitorController.getQRCode);
 
 module.exports = router;

@@ -1,4 +1,5 @@
 const express = require("express");
+const { authMiddleware } = require("../middleware/authMiddleware");
 const {
     registerPersonalVehicle,
     registerGuestVehicle,
@@ -11,21 +12,21 @@ const {
 const router = express.Router();
 
 // Resident Panel - Register Personal Vehicle
-router.post("/register/resident", registerPersonalVehicle);
+router.post("/register/resident", authMiddleware,  registerPersonalVehicle);
 
-// Visitor Panel - Register Guest Vehicle
-router.post("/register/guest", registerGuestVehicle);
+// Resident Panel - Register Guest Vehicle
+router.post("/register/guest", authMiddleware,  registerGuestVehicle);
 
 // Security Guard Panel - Verify Entry
-router.post("/verify/:vehicle_no/:action", verifyVehicleEntry);
+router.post("/verify/:vehicle_no/:action", authMiddleware,  verifyVehicleEntry);
 
 // Admin Panel - Block Vehicle
-router.put("/block/:vehicle_no", blockVehicle);
+router.put("/block/:vehicle_no", authMiddleware,  blockVehicle);
 
 // Admin Panel - Unblock Vehicle
-router.put("/unblock/:vehicle_no", unblockVehicle);
+router.put("/unblock/:vehicle_no", authMiddleware,  unblockVehicle);
 
 // Admin Panel - Get All Vehicles
-router.get("/all", getAllVehicles);
+router.get("/all", authMiddleware,  getAllVehicles);
 
 module.exports = router;

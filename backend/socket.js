@@ -1,32 +1,53 @@
-const { Server } = require("socket.io");
+const socketIO = require('socket.io');
 
 let io;
 
-function initializeSocket(server) {
-  io = new Server(server, {
+const initializeSocket = (server) => {
+  io = socketIO(server, {
     cors: {
       origin: "http://localhost:5173",
-      methods: ["GET", "POST"],
-      credentials: true,
-    },
+      methods: ["GET", "POST", "PUT", "DELETE"]
+    }
   });
 
-  io.on("connection", (socket) => {
-    console.log("New client connected");
+  io.on('connection', (socket) => {
+    console.log('Socket is connected'); // Log when a socket connects
 
-    socket.on("disconnect", () => {
-      console.log("Client disconnected");
+    // Handle authentication or other events
+    socket.on('authenticate', (token) => {
+      // Authentication logic here
+    });
+
+    socket.on('disconnect', () => {
+      console.log('Client disconnected'); // Log when a socket disconnects
     });
   });
 
   return io;
-}
+};
 
-function getIO() {
+
+io.on('connection', (socket) => {
+  // Security/admin joins emergency room
+  socket.on('joinEmergencyRoom', () => {
+    socket.join('emergencyRoom');
+  });
+
+  // Resident joins their personal room
+  socket.on('joinUserRoom', (userId) => {
+    socket.join(`user_${userId}`);
+  });
+});
+
+
+const getIO = () => {
   if (!io) {
-    throw new Error("Socket.io has not been initialized!");
+    throw new Error('Socket.io not initialized');
   }
   return io;
-}
+};
 
-module.exports = { initializeSocket, getIO };
+module.exports = {
+  initializeSocket,
+  getIO
+};

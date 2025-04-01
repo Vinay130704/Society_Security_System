@@ -10,11 +10,11 @@ const {
 
 const { authMiddleware } = require("../middleware/authMiddleware");
 
-// Routes
-router.post("/create", authMiddleware, createDeliveryRequest);
-router.post("/scan", authMiddleware, scanQrCode);
-router.put("/edit/:deliveryId", authMiddleware, editDeliveryDetails);
-router.delete("/delete/:deliveryId", authMiddleware, deleteDeliveryRequest);
-router.get("/all", authMiddleware, getAllDeliveryRequests);
+// Routes with access comments
+router.post("/create", authMiddleware, createDeliveryRequest); // Restricted to residents only
+router.post("/scan", authMiddleware, scanQrCode); // Restricted to security guards only
+router.put("/edit/:deliveryId", authMiddleware, editDeliveryDetails); // Restricted to residents only
+router.delete("/delete/:deliveryId", authMiddleware, deleteDeliveryRequest); // Restricted to residents only
+router.get("/all", authMiddleware, getAllDeliveryRequests); // Accessible to authenticated users (role-based logic handled in controller)
 
 module.exports = router;

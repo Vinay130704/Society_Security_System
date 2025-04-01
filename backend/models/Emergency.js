@@ -25,7 +25,7 @@ const EmergencyAlertSchema = new mongoose.Schema({
     type: String,
   },
   photo: {
-    type: String, // Optional image URL
+    type: String, // URL to stored image
   },
   timestamp: {
     type: Date,
@@ -38,8 +38,8 @@ const EmergencyAlertSchema = new mongoose.Schema({
   },
   repeatedAttempts: {
     type: Number,
-    default: 0, // Used for tracking repeated unauthorized entries
+    default: 0,
   },
-});
+}, { timestamps: true });
 
 module.exports = mongoose.model("EmergencyAlert", EmergencyAlertSchema);

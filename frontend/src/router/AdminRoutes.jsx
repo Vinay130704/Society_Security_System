@@ -4,6 +4,7 @@ import AdminDashboard from "../pages/Admin/AdminDashboard";
 import ManageResidents from "../pages/Admin/ManageResidents";
 import UserManagement from "../pages/Admin/UsersManagement";
 import VisitorLogs from "../pages/Admin/VisitorLogs";
+import ManageGuard from "../pages/Admin/ManageGuards";
 
 const AdminRoutes = () => {
   return (
@@ -12,6 +13,7 @@ const AdminRoutes = () => {
       <Route path="user-management" element={<UserManagement />} />
       <Route path="manage-residents" element={<ManageResidents />} />
       <Route path="visitor-log" element={<VisitorLogs />} />
+      <Route path="guards" element={<ManageGuard />} />
     </Routes>
   );
 };
