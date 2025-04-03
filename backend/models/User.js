@@ -1,15 +1,19 @@
 const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
 
 const userSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: true
+      required: true,
+      trim: true
     },
     email: {
       type: String,
+      required: true,
       unique: true,
-      required: true
+      trim: true,
+      lowercase: true
     },
     password: {
       type: String,
@@ -17,12 +21,14 @@ const userSchema = new mongoose.Schema(
     },
     phone: {
       type: String,
-      required: true
+      required: true,
+      trim: true
     },
     role: {
       type: String,
       enum: ["admin", "security", "resident"],
-      default: "resident"
+      default: "resident",
+      required: true
     },
     flat_no: {
       type: String,
@@ -30,34 +36,56 @@ const userSchema = new mongoose.Schema(
         return this.role === "resident";
       },
       unique: function () {
-        return this.role === "resident"; // ✅ Only enforce uniqueness for residents
+        return this.role === "resident";
       },
-      sparse: true
+      sparse: true,
+      trim: true
     },
     approval_status: {
       type: String,
       enum: ["pending", "approved", "rejected"],
       default: function () {
-        return this.role === "admin" ? "approved" : "pending"; // ✅ Admin auto-approved
+        return this.role === "admin" ? "approved" : "pending";
       }
-    }
+    },
+    permanentId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      trim: true
+    },
+    profilePicture: {
+      type: String,
+      default: ""
+    },
+    familyMembers: [
+      {
+        name: String,
+        relation: String,
+        gender: { type: String, enum: ["male", "female", "-"], default: "-" },
+        profilePicture: String
+      }
+    ]
   },
-  { timestamps: true } // ✅ Correct placement of timestamps
+  { timestamps: true }
 );
 
+// Hash password before saving
+userSchema.pre("save", async function (next) {
+  if (!this.isModified("password")) return next();
 
-// ✅ Remove `flat_no` if the role is not "resident"
-userSchema.pre("save", function (next) {
-  if (this.role !== "resident") {
-    this.flat_no = undefined;
+  try {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (err) {
+    next(err);
   }
-  next();
 });
 
-// ✅ Auto-delete unapproved users after 24 hours
-userSchema.index(
-  { createdAt: 1 },
-  { expireAfterSeconds: 86400, partialFilterExpression: { approval_status: "pending" } }
-);
+// Method to compare passwords
+userSchema.methods.comparePassword = async function (candidatePassword) {
+  return await bcrypt.compare(candidatePassword, this.password);
+};
 
 module.exports = mongoose.model("User", userSchema);

@@ -14,9 +14,9 @@ const VisitorLogs = () => {
         console.log("Full API Response:", response.data); // Debugging
     
         if (Array.isArray(response.data.visitors)) {
-          setVisitorLogs(response.data.visitors); // ✅ Store the array only
+          setVisitorLogs(response.data.visitors); // Store the array only
         } else {
-          setVisitorLogs([]); // ✅ Fallback in case visitors is not an array
+          setVisitorLogs([]); // Fallback in case visitors is not an array
         }
       } catch (error) {
         console.error("Error fetching visitor logs:", error);

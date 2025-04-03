@@ -27,17 +27,17 @@ const initializeSocket = (server) => {
 };
 
 
-io.on('connection', (socket) => {
-  // Security/admin joins emergency room
-  socket.on('joinEmergencyRoom', () => {
-    socket.join('emergencyRoom');
-  });
+// io.on('connection', (socket) => {
+//   // Security/admin joins emergency room
+//   socket.on('joinEmergencyRoom', () => {
+//     socket.join('emergencyRoom');
+//   });
 
-  // Resident joins their personal room
-  socket.on('joinUserRoom', (userId) => {
-    socket.join(`user_${userId}`);
-  });
-});
+//   // Resident joins their personal room
+//   socket.on('joinUserRoom', (userId) => {
+//     socket.join(`user_${userId}`);
+//   });
+// });
 
 
 const getIO = () => {

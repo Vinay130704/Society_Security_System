@@ -29,6 +29,7 @@ const deliveryRoutes = require("./routes/Delivery-Routes");
 const emergencyRoutes = require("./routes/EmergencyRoutes");
 const workerRoutes = require("./routes/workerRoutes");
 const eventRoutes = require("./routes/EventRoutes");
+const profileRoutes = require("./routes/profileRoutes");
 
 // Initialize Express app
 const app = express();
@@ -63,7 +64,7 @@ app.use("/api/delivery", deliveryRoutes);
 app.use("/api/emergency", emergencyRoutes);
 app.use("/api/worker", workerRoutes);
 app.use("/api/event", eventRoutes);
-
+app.use("/api/profile", profileRoutes);
 
 // Error handling middleware (must be last)
 app.use(errorHandler);

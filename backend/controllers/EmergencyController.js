@@ -1,6 +1,6 @@
 const EmergencyAlert = require("../models/Emergency");
 const { getIO } = require("../socket");
-const { playSoundAlert } = require("../utils/soundAlert");
+const { playSoundAlert } = require("../utils/emergencyAlert");
 
 // Resident creates emergency alert
 exports.createAlert = async (req, res) => {

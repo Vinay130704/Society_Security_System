@@ -3,134 +3,332 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const { sendOTP, verifyOTP } = require("../utils/otpSend");
 
-// Register Function
 exports.register = async (req, res) => {
   try {
-    const { name, email, password, role, flat_no, phone } = req.body;
-    console.log("Extracted Data:", { name, email, password, role, flat_no, phone }); 
+    const { name, email, password, role, flat_no, phone, otp, profilePicture, familyMembers } = req.body;
 
-    // Check if email already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: "User already exists with this email." });
+    if (!name || !email || !password || !phone || !role) {
+      return res.status(400).json({ 
+        success: false,
+        message: "All required fields must be provided" 
+      });
     }
 
-    // **Check if flat number is already assigned to another resident**
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Email already registered" 
+      });
+    }
+
     if (role === "resident") {
+      if (!flat_no) {
+        return res.status(400).json({ 
+          success: false,
+          message: "Flat number required for residents" 
+        });
+      }
       const existingFlat = await User.findOne({ flat_no });
       if (existingFlat) {
-        return res.status(400).json({ message: "Flat is already registered." });
+        return res.status(400).json({ 
+          success: false,
+          message: "Flat is already registered" 
+        });
       }
     }
 
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    if (!otp) {
+      try {
+        await sendOTP(email);
+        return res.json({ 
+          success: true,
+          message: "OTP sent to email",
+          nextStep: "Verify OTP to complete registration"
+        });
+      } catch (error) {
+        return res.status(500).json({
+          success: false,
+          message: "Failed to send OTP"
+        });
+      }
+    }
 
-    // Create new user
+    if (!verifyOTP(email, otp)) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Invalid or expired OTP" 
+      });
+    }
+
     const newUser = new User({
       name,
       email,
-      password: hashedPassword,
+      password: await bcrypt.hash(password, 10),
       role,
       phone,
-      flat_no: role === "resident" ? flat_no : null,
-      approval_status: "pending" // Ensure approval starts as "pending"
+      flat_no: role === "resident" ? flat_no : undefined,
+      profilePicture: profilePicture || "",
+      familyMembers: familyMembers || [],
+      approval_status: role === "admin" ? "approved" : "pending"
     });
 
     await newUser.save();
 
-    console.log("Incoming Request Body:", req.body);
+    let token = null;
+    if (newUser.approval_status === "approved") {
+      token = jwt.sign(
+        { userId: newUser._id, role: newUser.role },
+        process.env.JWT_SECRET,
+        { expiresIn: "1h" }
+      );
+    }
+
+    const userResponse = newUser.toObject();
+    delete userResponse.password;
 
     res.status(201).json({
-      message: "User registered successfully. Pending admin approval."
+      success: true,
+      message: role === "admin" ? "Admin registered" : "Pending approval",
+      token,
+      user: userResponse
     });
 
   } catch (err) {
-    res.status(500).json({ message: "Server error", error: err.message });
+    console.error("Registration error:", err);
+    res.status(500).json({ 
+      success: false,
+      message: "Registration failed",
+      error: err.message 
+    });
   }
 };
 
-
-// login function
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ message: "Email and password are required" });
+      return res.status(400).json({ 
+        success: false,
+        message: "Email and password required" 
+      });
     }
 
-    // Find user by email
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(401).json({ message: "Invalid credentials" });
+      return res.status(401).json({ 
+        success: false,
+        message: "Invalid credentials" 
+      });
     }
 
-    // Check if the user is approved
     if (user.approval_status !== "approved") {
-      return res.status(403).json({ message: "Your account is not approved yet. Please wait for admin approval." });
+      return res.status(403).json({ 
+        success: false,
+        message: "Account not approved yet" 
+      });
     }
 
-    // Verify password
-    const isMatch = await bcrypt.compare(password, user.password);
+    const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      return res.status(401).json({ message: "Invalid email or password" });
+      return res.status(401).json({ 
+        success: false,
+        message: "Invalid credentials" 
+      });
     }
 
-    // Generate JWT token
     const token = jwt.sign(
       { userId: user._id, role: user.role },
-      process.env.JWT_SECRET, 
+      process.env.JWT_SECRET,
       { expiresIn: "1h" }
     );
 
-    res.status(200).json({ token, role: user.role, message: "Login successful!" });
+    const userResponse = user.toObject();
+    delete userResponse.password;
+
+    res.json({
+      success: true,
+      token,
+      user: userResponse,
+      message: "Login successful"
+    });
+
   } catch (error) {
-    console.error("Login Error:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+    console.error("Login error:", error);
+    res.status(500).json({ 
+      success: false,
+      message: "Login failed" 
+    });
   }
 };
 
-
-exports.requestOTP = async (req, res) => {
+// Forgot Password - Send OTP
+exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
-    const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ message: "User not found." });
-
-    const otpResponse = await sendOTP(email);
-    if (!otpResponse.success) {
-      return res.status(500).json({ message: "Error sending OTP." });
+    if (!email) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Email required" 
+      });
     }
 
-    res.json({ message: "OTP sent successfully." });
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        message: "User not found" 
+      });
+    }
+
+    await sendOTP(email);
+    res.json({ 
+      success: true,
+      message: "OTP sent for password reset" 
+    });
+
   } catch (err) {
-    console.error("Error sending OTP:", err);
-    res.status(500).json({ message: "Server error", error: err.message });
+    console.error("Forgot password error:", err);
+    res.status(500).json({ 
+      success: false,
+      message: "Failed to send OTP" 
+    });
   }
 };
 
-
-exports.changePassword = async (req, res) => {
+// Reset Password with OTP
+exports.resetPassword = async (req, res) => {
   try {
     const { email, otp, newPassword } = req.body;
-
-    if (!verifyOTP(email, otp)) {
-      return res.status(400).json({ message: "Invalid or expired OTP." });
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Email, OTP and new password required" 
+      });
     }
 
+    // Verify OTP
+    if (!verifyOTP(email, otp)) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Invalid or expired OTP" 
+      });
+    }
+
+    // Update password
     const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ message: "User not found." });
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        message: "User not found" 
+      });
+    }
 
     user.password = await bcrypt.hash(newPassword, 10);
     await user.save();
 
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+    // Return updated user data without password
+    const userResponse = user.toObject();
+    delete userResponse.password;
 
-    res.json({ message: "Password changed successfully.", token });
+    res.json({ 
+      success: true,
+      user: userResponse,
+      message: "Password reset successful" 
+    });
+
   } catch (err) {
-    console.error("Error changing password:", err);
-    res.status(500).json({ message: "Server error", error: err.message });
+    console.error("Reset password error:", err);
+    res.status(500).json({ 
+      success: false,
+      message: "Password reset failed" 
+    });
   }
 };
+
+// Change Password (for authenticated users)
+exports.changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const userId = req.user.userId;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Current and new passwords required" 
+      });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        message: "User not found" 
+      });
+    }
+
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      return res.status(401).json({ 
+        success: false,
+        message: "Current password is incorrect" 
+      });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    // Return updated user data without password
+    const userResponse = user.toObject();
+    delete userResponse.password;
+
+    res.json({ 
+      success: true,
+      user: userResponse,
+      message: "Password changed successfully" 
+    });
+
+  } catch (err) {
+    console.error("Change password error:", err);
+    res.status(500).json({ 
+      success: false,
+      message: "Failed to change password" 
+    });
+  }
+};
+
+// Verify OTP (generic)
+exports.verifyOTP = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Email and OTP required" 
+      });
+    }
+
+    if (!verifyOTP(email, otp)) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Invalid or expired OTP" 
+      });
+    }
+
+    res.json({ 
+      success: true,
+      message: "OTP verified successfully" 
+    });
+
+  } catch (err) {
+    console.error("OTP verification error:", err);
+    res.status(500).json({ 
+      success: false,
+      message: "OTP verification failed" 
+    });
+  }
+};
+
+
+

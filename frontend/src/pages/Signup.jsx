@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { toast } from "react-toastify"; // ✅ Import Toast
-import "react-toastify/dist/ReactToastify.css"; // ✅ Import Toast CSS
+import { toast } from "react-toastify";
+import { Shield, User, Mail, Lock, Phone, ChevronDown } from "lucide-react";
 import SignupImage from "../assets/signup.jpeg";
 
 const URL = "http://localhost:5000/api/auth/register";
@@ -12,9 +12,9 @@ const Signup = () => {
     email: "",
     password: "",
     phone: "",
-    role: "security", // Default to Security
+    role: "security",
   });
-
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -27,29 +27,31 @@ const Signup = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    // Ensure `flat_no` is only sent for residents
-    const userData =
-      user.role === "resident"
-        ? user
-        : { name: user.name, email: user.email, password: user.password, phone: user.phone, role: user.role };
+    setIsLoading(true);
+    const toastId = toast.loading("Processing your registration...");
 
     try {
       const response = await fetch(URL, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(userData),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(user.role === "resident" ? user : {
+          name: user.name,
+          email: user.email,
+          password: user.password,
+          phone: user.phone,
+          role: user.role
+        }),
       });
 
-      const responseData = await response.json();
-      console.log("Server Response:", responseData);
+      const data = await response.json();
 
       if (response.ok) {
-        toast.success("Registration Successful! Awaiting Admin Approval.");
-
-        // ✅ Clear Form
+        toast.update(toastId, {
+          render: "Registration Successful! Awaiting Admin Approval.",
+          type: "success",
+          isLoading: false,
+          autoClose: 3000,
+        });
         setUser({
           name: "",
           email: "",
@@ -57,54 +59,206 @@ const Signup = () => {
           phone: "",
           role: "security",
         });
-
-        setTimeout(() => navigate("/"), 2000); // Redirect after 2 sec
+        setTimeout(() => navigate("/"), 2000);
       } else {
-        // Handle validation errors from the backend
-        if (data.extraDetails) {
-          toast.info(data.extraDetails); // Show backend validation message
-        } else {
-          toast.error(data.message || "Registration failed!");
-        }
+        toast.update(toastId, {
+          render: data.extraDetails || data.message || "Registration failed!",
+          type: "error",
+          isLoading: false,
+          autoClose: 3000,
+        });
       }
     } catch (error) {
+      toast.update(toastId, {
+        render: "Network error. Please try again.",
+        type: "error",
+        isLoading: false,
+        autoClose: 3000,
+      });
       console.error("Registration Error!", error);
-      toast.error("Network error. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="flex justify-center items-center h-screen bg-gray-100">
-      <div className="flex bg-white shadow-lg rounded-lg overflow-hidden w-[800px]">
+    <div className="min-h-screen bg-background flex items-center justify-center px-4 pt-24 pb-8">
+      <div className="w-full max-w-4xl bg-white rounded-xl shadow-2xl overflow-hidden">
+        <div className="flex flex-col md:flex-row">
+          {/* Left Side - Image */}
+          <div className="md:w-1/2 bg-gradient-to-b from-primary to-primary-dark hidden md:flex items-center justify-center p-8">
+            <div className="text-center text-white">
+              <Shield className="h-16 w-16 mx-auto mb-4" />
+              <h1 className="text-3xl font-bold mb-2">Join GuardianNet</h1>
+              <p className="text-gray-300">Secure your community with our advanced protection system</p>
+              <div className="mt-8">
+                <img 
+                  src={SignupImage} 
+                  alt="Security System" 
+                  className="rounded-lg shadow-lg border-4 border-secondary/30 object-cover h-64 w-full"
+                />
+              </div>
+            </div>
+          </div>
 
-        {/* Left Side Image */}
-        <div className="w-1/2 hidden md:flex items-center justify-center bg-primary">
-          <img src={SignupImage} alt="Signup" className="w-full h-full object-cover" />
-        </div>
+          {/* Right Side - Form */}
+          <div className="md:w-1/2 p-8 md:p-12">
+            <div className="text-center mb-8">
+              <Shield className="h-10 w-10 text-secondary mx-auto" />
+              <h2 className="text-2xl font-bold text-primary mt-4">Create Account</h2>
+              <p className="text-gray-600 mt-2">Register for secure access</p>
+            </div>
 
-        {/* Right Side Form */}
-        <div className="w-full md:w-1/2 p-8">
-          <h2 className="text-2xl font-bold text-center text-primary mb-4">Registration Form</h2>
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div className="space-y-1">
+                <label htmlFor="name" className="block text-sm font-medium text-primary">
+                  Full Name
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <User className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    id="name"
+                    name="name"
+                    placeholder="John Doe"
+                    value={user.name}
+                    onChange={handleChange}
+                    required
+                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-secondary focus:border-secondary"
+                  />
+                </div>
+              </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <input type="text" name="name" placeholder="Full Name" value={user.name}
-              onChange={handleChange} className="w-full p-2 border rounded-md" required />
-            <input type="email" name="email" placeholder="Email" value={user.email} onChange={handleChange} className="w-full p-2 border rounded-md" required />
-            <input type="password" name="password" placeholder="Password" value={user.password} onChange={handleChange} className="w-full p-2 border rounded-md" required />
-            <input type="text" name="phone" placeholder="Phone Number" value={user.phone} onChange={handleChange} className="w-full p-2 border rounded-md" required />
+              <div className="space-y-1">
+                <label htmlFor="email" className="block text-sm font-medium text-primary">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Mail className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    placeholder="your@email.com"
+                    value={user.email}
+                    onChange={handleChange}
+                    required
+                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-secondary focus:border-secondary"
+                  />
+                </div>
+              </div>
 
-            <select name="role" value={user.role} onChange={handleChange} className="w-full p-2 border rounded-md" required>
-              <option value="admin">Admin</option>
-              <option value="security">Security</option>
-            </select>
+              <div className="space-y-1">
+                <label htmlFor="password" className="block text-sm font-medium text-primary">
+                  Password
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Lock className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    placeholder="••••••••"
+                    value={user.password}
+                    onChange={handleChange}
+                    required
+                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-secondary focus:border-secondary"
+                  />
+                </div>
+              </div>
 
-            <button type="submit" className="w-full bg-secondary text-white py-2 rounded-md hover:bg-primary transition">Sign Up</button>
-          </form>
+              <div className="space-y-1">
+                <label htmlFor="phone" className="block text-sm font-medium text-primary">
+                  Phone Number
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Phone className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="tel"
+                    id="phone"
+                    name="phone"
+                    placeholder="+1 (123) 456-7890"
+                    value={user.phone}
+                    onChange={handleChange}
+                    required
+                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-secondary focus:border-secondary"
+                  />
+                </div>
+              </div>
 
-          <p className="text-center mt-4 text-gray-600">
-            Already registered?
-            <Link to="/login" className="text-primary font-bold hover:underline ml-1">Login</Link>
-          </p>
+              <div className="space-y-1">
+                <label htmlFor="role" className="block text-sm font-medium text-primary">
+                  Account Type
+                </label>
+                <div className="relative">
+                  <select
+                    id="role"
+                    name="role"
+                    value={user.role}
+                    onChange={handleChange}
+                    required
+                    className="appearance-none block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-secondary focus:border-secondary"
+                  >
+                    <option value="admin">Admin</option>
+                    <option value="security">Security</option>
+                  </select>
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <ChevronDown className="h-5 w-5 text-gray-400" />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-secondary hover:bg-secondary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary transition-colors ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
+                >
+                  {isLoading ? (
+                    <span className="flex items-center">
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Registering...
+                    </span>
+                  ) : (
+                    'Create Account'
+                  )}
+                </button>
+              </div>
+            </form>
+
+            <div className="mt-6">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-300"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-white text-gray-500">
+                    Already have an account?
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <Link
+                  to="/login"
+                  className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-primary bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary transition-colors"
+                >
+                  Sign in instead
+                </Link>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
