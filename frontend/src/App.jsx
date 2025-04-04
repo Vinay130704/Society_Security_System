@@ -7,7 +7,6 @@ import HowItWorks from "./components/HowItWorks";
 import UserRoles from "./components/UserRoles";
 import Testimonials from "./pages/Testimonials";
 import ContactUs from "./pages/ContactUs";
-import Register from "./pages/Signup";
 import Login from "./pages/Login";
 import AboutUs from "./pages/About";
 import ResidentRoutes from "./router/ResidentRoutes";
@@ -16,6 +15,7 @@ import ChangePassword from "./pages/ResetPassword";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ResidentSignup from "./pages/Resident/ResidentRegister";
 import AdminRoutes from "./router/AdminRoutes";
+import AdminSecurityRegister from "./pages/Signup";
 
 function App() {
   return (
@@ -30,10 +30,10 @@ function App() {
         <Route path="/user-roles" element={<UserRoles />} />
         <Route path="/testimonials" element={<Testimonials />} />
         <Route path="/contact" element={<ContactUs />} />
-        <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
         <Route path="/reset-password" element={<ChangePassword />} />
         <Route path="/resident-register" element={<ResidentSignup />} />
+        <Route path="/admin-security-register" element={<AdminSecurityRegister />} />
 
         {/* Protected Routes */}
         <Route element={<ProtectedRoute />}>

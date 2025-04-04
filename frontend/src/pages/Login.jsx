@@ -1,14 +1,11 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import LoginImage from "../assets/signup.jpeg";
 import { useAuth } from "../Context/AuthContext";
 import { toast } from "react-toastify";
 import { Shield, Lock, Mail, Eye, EyeOff } from "lucide-react";
 
-const URL = "http://localhost:5000/api/auth/login";
-
 const Login = () => {
-  const { setToken } = useAuth() || {};
+  const auth = useAuth();
   const [loginData, setLoginData] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -24,7 +21,7 @@ const Login = () => {
     setIsLoading(true);
     
     try {
-      const response = await fetch(URL, {
+      const response = await fetch("http://localhost:5000/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(loginData),
@@ -32,32 +29,34 @@ const Login = () => {
 
       const data = await response.json();
 
-      if (response.ok) {
-        toast.success("Login successful!");
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("role", data.role);
-        if (setToken) setToken(data.token);
-
-        if (data.isTempPassword) {
-          toast.info("You must reset your password before proceeding.");
-          navigate("/reset-password");
-          return;
-        }
-
-        const roleRedirects = {
-          admin: "/admin/admin-dashboard",
-          resident: "/resident/resident-dashboard",
-          security: "/security/security-dashboard",
-        };
-
-        const redirectPath = roleRedirects[data.role];
-        navigate(redirectPath || "/");
-      } else {
-        toast.error(data.message || "Login failed!");
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Login failed");
       }
+
+      toast.success("Login successful!");
+
+      // Store token and role
+      if (auth?.LoginUser) {
+        auth.LoginUser(data.token, data.user.role);
+      }
+
+      // Role-based redirection
+      const dashboardPaths = {
+        admin: "/admin/admin-dashboard",
+        resident: "/resident/dashboard",
+        security: "/security/dashboard"
+      };
+
+      const redirectPath = dashboardPaths[data.user.role];
+      if (redirectPath) {
+        navigate(redirectPath);
+      } else {
+        navigate("/");
+      }
+
     } catch (error) {
-      console.error("Error during login:", error);
-      toast.error("Something went wrong. Please try again.");
+      console.error("Login error:", error);
+      toast.error(error.message || "Login failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -74,11 +73,11 @@ const Login = () => {
               <h1 className="text-3xl font-bold mb-2">Welcome to GuardianNet</h1>
               <p className="text-blue-100">Your community's security is our top priority</p>
               <div className="mt-8">
-                <img 
-                  src={LoginImage} 
-                  alt="Security System" 
+                {/* <img
+                  src={LoginImage}
+                  alt="Security System"
                   className="rounded-lg shadow-lg border-4 border-blue-300/30 object-cover h-64 w-full"
-                />
+                /> */}
               </div>
             </div>
           </div>
@@ -107,8 +106,8 @@ const Login = () => {
                     placeholder="your@email.com"
                     value={loginData.email}
                     onChange={handleChange}
-                    required
                     className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-secondary focus:border-secondary"
+                    required
                   />
                 </div>
               </div>
@@ -128,8 +127,8 @@ const Login = () => {
                     placeholder="••••••••"
                     value={loginData.password}
                     onChange={handleChange}
-                    required
                     className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-secondary focus:border-secondary"
+                    required
                   />
                   <button
                     type="button"
@@ -160,7 +159,7 @@ const Login = () => {
 
                 <div className="text-sm">
                   <Link
-                    to="/reset-password"
+                    to="/forgot-password"
                     className="font-medium text-secondary hover:text-primary"
                   >
                     Forgot password?

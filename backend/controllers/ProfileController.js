@@ -19,57 +19,94 @@ const profilePicStorage = multer.diskStorage({
 
 const uploadProfilePic = multer({
   storage: profilePicStorage,
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
   fileFilter: (req, file, cb) => {
     const filetypes = /jpeg|jpg|png/;
     const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = filetypes.test(file.mimetype);
-    extname && mimetype ? cb(null, true) : cb(new Error("Only images are allowed (JPEG, JPG, PNG)"));
+    if (extname && mimetype) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only images are allowed (JPEG, JPG, PNG)"));
+    }
   }
 }).single("profilePicture");
 
 // Get user profile
 exports.getProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id)
-      .select("-password")
-      .populate("familyMembers.profilePicture");
-    
+    const userId = req.user.role === 'admin' && req.params.userId ? req.params.userId : req.user.userId;
+    const user = await User.findById(userId)
+      .select("-password -__v")
+      .lean();
+
     if (!user) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: "User not found" 
+        message: "User not found"
       });
     }
 
-    res.status(200).json({ 
+    if (user.profilePicture) {
+      user.profilePicture = user.profilePicture.replace(/\\/g, "/");
+    }
+
+    res.status(200).json({
       success: true,
-      user 
+      user
     });
   } catch (error) {
-    res.status(500).json({ 
+    console.error("Get profile error:", error);
+    res.status(500).json({
       success: false,
       message: "Server error",
-      error: error.message 
+      error: process.env.NODE_ENV === "development" ? error.message : undefined
     });
   }
 };
 
-// Update profile details
+// Update profile details (without password)
 exports.updateProfile = async (req, res) => {
   try {
     const { name, email, phone, flat_no } = req.body;
-    const userId = req.user.role === 'admin' && req.params.userId ? req.params.userId : req.user._id;
+    const userId = req.user.role === 'admin' && req.params.userId ? req.params.userId : req.user.userId;
 
-    const updates = { name, email, phone };
-    
-    // Only update flat_no for residents
-    if (req.user.role === "resident" && flat_no) {
-      const existingFlat = await User.findOne({ flat_no });
-      if (existingFlat && existingFlat._id.toString() !== userId) {
-        return res.status(400).json({ 
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    const updates = {};
+    if (name) updates.name = name;
+    if (email && email !== user.email) {
+      const emailExist = await User.findOne({ email });
+      if (emailExist) {
+        return res.status(400).json({
           success: false,
-          message: "Flat number already in use" 
+          message: "Email already registered"
+        });
+      }
+      updates.email = email;
+    }
+    if (phone && phone !== user.phone) {
+      const phoneExist = await User.findOne({ phone });
+      if (phoneExist) {
+        return res.status(400).json({
+          success: false,
+          message: "Phone already registered"
+        });
+      }
+      updates.phone = phone;
+    }
+    if (flat_no && user.role === "resident" && flat_no !== user.flat_no) {
+      const existingFlat = await User.findOne({ flat_no, _id: { $ne: userId } });
+      if (existingFlat) {
+        return res.status(400).json({
+          success: false,
+          message: "Flat number already in use"
         });
       }
       updates.flat_no = flat_no;
@@ -79,18 +116,26 @@ exports.updateProfile = async (req, res) => {
       userId,
       updates,
       { new: true, runValidators: true }
-    ).select("-password");
+    ).select("-password -__v");
 
-    res.status(200).json({ 
+    if (!updatedUser) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    res.status(200).json({
       success: true,
       message: "Profile updated successfully",
       user: updatedUser
     });
   } catch (error) {
-    res.status(400).json({ 
+    console.error("Update profile error:", error);
+    res.status(400).json({
       success: false,
       message: "Update failed",
-      error: error.message 
+      error: error.message.includes("validation") ? "Invalid data provided" : error.message
     });
   }
 };
@@ -99,153 +144,241 @@ exports.updateProfile = async (req, res) => {
 exports.updateProfilePicture = async (req, res) => {
   uploadProfilePic(req, res, async (err) => {
     if (err) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: err.message 
+        message: err.message
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "No file uploaded"
       });
     }
 
     try {
-      const userId = req.user.role === 'admin' && req.params.userId ? req.params.userId : req.user._id;
+      const userId = req.user.role === 'admin' && req.params.userId ? req.params.userId : req.user.userId;
       const user = await User.findById(userId);
-      
-      // Delete old picture if exists
-      if (user.profilePicture && fs.existsSync(user.profilePicture)) {
-        fs.unlinkSync(user.profilePicture);
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found"
+        });
       }
 
-      user.profilePicture = req.file.path.replace(/\\/g, "/");
+      if (user.profilePicture && fs.existsSync(user.profilePicture)) {
+        try {
+          fs.unlinkSync(user.profilePicture);
+        } catch (unlinkError) {
+          console.error("Failed to delete old profile picture:", unlinkError);
+        }
+      }
+
+      const filePath = req.file.path.replace(/\\/g, "/");
+      user.profilePicture = filePath;
       await user.save();
 
-      res.status(200).json({ 
+      res.status(200).json({
         success: true,
         message: "Profile picture updated",
-        profilePicture: user.profilePicture
+        profilePicture: filePath
       });
     } catch (error) {
-      res.status(500).json({ 
+      console.error("Profile picture update error:", error);
+      res.status(500).json({
         success: false,
         message: "Failed to update profile picture",
-        error: error.message 
+        error: process.env.NODE_ENV === "development" ? error.message : undefined
       });
     }
   });
 };
 
-// Add/Update family member (Resident only)
-exports.updateFamilyMember = async (req, res) => {
+// Family member management
+exports.addFamilyMember = async (req, res) => {
   try {
     if (req.user.role !== "resident") {
-      return res.status(403).json({ 
+      return res.status(403).json({
         success: false,
-        message: "Only residents can manage family members" 
+        message: "Only residents can manage family members"
       });
     }
 
-    const { memberId, name, relation, gender } = req.body;
-    const user = await User.findById(req.user._id);
-
-    if (memberId) {
-      // Update existing member
-      const memberIndex = user.familyMembers.findIndex(m => m._id == memberId);
-      if (memberIndex === -1) {
-        return res.status(404).json({ 
-          success: false,
-          message: "Family member not found" 
-        });
-      }
-
-      user.familyMembers[memberIndex] = {
-        ...user.familyMembers[memberIndex].toObject(),
-        name: name || user.familyMembers[memberIndex].name,
-        relation: relation || user.familyMembers[memberIndex].relation,
-        gender: gender || user.familyMembers[memberIndex].gender
-      };
-    } else {
-      // Add new member
-      if (!name || !relation) {
-        return res.status(400).json({ 
-          success: false,
-          message: "Name and relation are required" 
-        });
-      }
-      user.familyMembers.push({
-        name,
-        relation,
-        gender: gender || "other"
+    const { name, relation, gender } = req.body;
+    if (!name || !relation) {
+      return res.status(400).json({
+        success: false,
+        message: "Name and relation are required"
       });
     }
 
+    const user = await User.findById(req.user.userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    const familyMember = {
+      name,
+      relation,
+      gender: gender || "-",
+      permanentId: `PID${Date.now()}${Math.floor(Math.random() * 1000)}`
+    };
+    user.familyMembers.push(familyMember);
     await user.save();
-    res.status(200).json({ 
+
+    res.status(201).json({
       success: true,
-      message: memberId ? "Member updated" : "Member added",
-      familyMembers: user.familyMembers
+      message: "Family member added",
+      familyMember: user.familyMembers[user.familyMembers.length - 1]
     });
   } catch (error) {
-    res.status(400).json({ 
+    console.error("Add family member error:", error);
+    res.status(500).json({
       success: false,
-      message: "Operation failed",
-      error: error.message 
+      message: "Failed to add family member",
+      error: error.message
     });
   }
 };
 
-// Remove family member (Resident only)
+exports.updateFamilyMember = async (req, res) => {
+  try {
+    if (req.user.role !== "resident") {
+      return res.status(403).json({
+        success: false,
+        message: "Only residents can manage family members"
+      });
+    }
+
+    const { memberId, name, relation, gender } = req.body;
+    if (!memberId) {
+      return res.status(400).json({
+        success: false,
+        message: "Member ID is required for update"
+      });
+    }
+
+    const user = await User.findById(req.user.userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    const memberIndex = user.familyMembers.findIndex(m => m._id.toString() === memberId);
+    if (memberIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: "Family member not found"
+      });
+    }
+
+    if (name) user.familyMembers[memberIndex].name = name;
+    if (relation) user.familyMembers[memberIndex].relation = relation;
+    if (gender) user.familyMembers[memberIndex].gender = gender;
+
+    await user.save();
+    res.status(200).json({
+      success: true,
+      message: "Family member updated",
+      familyMember: user.familyMembers[memberIndex]
+    });
+  } catch (error) {
+    console.error("Update family member error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update family member",
+      error: error.message
+    });
+  }
+};
+
 exports.removeFamilyMember = async (req, res) => {
   try {
     if (req.user.role !== "resident") {
-      return res.status(403).json({ 
+      return res.status(403).json({
         success: false,
-        message: "Only residents can manage family members" 
+        message: "Only residents can manage family members"
       });
     }
 
     const { memberId } = req.params;
-    const user = await User.findById(req.user._id);
-
-    const memberIndex = user.familyMembers.findIndex(m => m._id == memberId);
-    if (memberIndex === -1) {
-      return res.status(404).json({ 
+    const user = await User.findById(req.user.userId);
+    if (!user) {
+      return res.status(404).json({
         success: false,
-        message: "Family member not found" 
+        message: "User not found"
+      });
+    }
+
+    const memberIndex = user.familyMembers.findIndex(m => m._id.toString() === memberId);
+    if (memberIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: "Family member not found"
       });
     }
 
     user.familyMembers.splice(memberIndex, 1);
     await user.save();
 
-    res.status(200).json({ 
+    res.status(200).json({
       success: true,
-      message: "Member removed",
+      message: "Family member removed",
       familyMembers: user.familyMembers
     });
   } catch (error) {
-    res.status(500).json({ 
+    console.error("Remove family member error:", error);
+    res.status(500).json({
       success: false,
-      message: "Failed to remove member",
-      error: error.message 
+      message: "Failed to remove family member",
+      error: error.message
     });
   }
 };
 
-// Record entry/exit
+// Entry/Exit logs
 exports.recordEntryExit = async (req, res) => {
   try {
     const { permanentId, type, method } = req.body;
-    
-    if (!permanentId || !type || !['entry', 'exit'].includes(type)) {
-      return res.status(400).json({ 
+
+    if (!permanentId || !['entry', 'exit'].includes(type)) {
+      return res.status(400).json({
         success: false,
-        message: "Valid permanent ID and type (entry/exit) required" 
+        message: "Valid permanent ID and type (entry/exit) required"
       });
     }
 
-    const user = await User.findOne({ permanentId, role: "resident" });
+    let user, personName, isFamilyMember = false;
+    user = await User.findOne({ permanentId });
+    
     if (!user) {
-      return res.status(404).json({ 
+      // Check if permanentId belongs to a family member
+      user = await User.findOne({ "familyMembers.permanentId": permanentId });
+      if (user) {
+        const familyMember = user.familyMembers.find(m => m.permanentId === permanentId);
+        personName = familyMember.name;
+        isFamilyMember = true;
+      } else {
+        return res.status(404).json({
+          success: false,
+          message: "Resident or family member not found"
+        });
+      }
+    } else {
+      personName = user.name;
+    }
+
+    if (user.role !== "resident") {
+      return res.status(403).json({
         success: false,
-        message: "Resident not found" 
+        message: "Entry/Exit logs are only for residents and their family members"
       });
     }
 
@@ -254,31 +387,34 @@ exports.recordEntryExit = async (req, res) => {
       permanentId,
       type,
       method: method || "manual",
-      verifiedBy: req.user._id,
-      personName: user.name
+      verifiedBy: req.user.userId,
+      personName,
+      flatNo: user.flat_no,
+      isFamilyMember
     });
 
-    res.status(201).json({ 
+    res.status(201).json({
       success: true,
-      message: `${type} recorded for ${user.name}`,
+      message: `${type} recorded for ${personName}`,
       log
     });
   } catch (error) {
-    res.status(500).json({ 
+    console.error("Record entry/exit error:", error);
+    res.status(500).json({
       success: false,
       message: "Failed to record log",
-      error: error.message 
+      error: error.message
     });
   }
 };
 
-// Get resident logs
 exports.getResidentLogs = async (req, res) => {
   try {
     const { permanentId } = req.params;
     const { type, startDate, endDate, limit = 50 } = req.query;
 
-    const query = { permanentId };
+    const query = {};
+    if (permanentId) query.permanentId = permanentId;
     if (type) query.type = type;
     if (startDate || endDate) {
       query.timestamp = {};
@@ -290,17 +426,25 @@ exports.getResidentLogs = async (req, res) => {
       .populate("user", "name flat_no profilePicture")
       .populate("verifiedBy", "name role")
       .sort({ timestamp: -1 })
-      .limit(parseInt(limit));
+      .limit(parseInt(limit))
+      .lean();
 
-    res.status(200).json({ 
+    logs.forEach(log => {
+      if (log.user?.profilePicture) {
+        log.user.profilePicture = log.user.profilePicture.replace(/\\/g, "/");
+      }
+    });
+
+    res.status(200).json({
       success: true,
-      logs 
+      logs
     });
   } catch (error) {
-    res.status(500).json({ 
+    console.error("Get resident logs error:", error);
+    res.status(500).json({
       success: false,
       message: "Failed to fetch logs",
-      error: error.message 
+      error: error.message
     });
   }
 };

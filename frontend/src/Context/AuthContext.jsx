@@ -1,52 +1,56 @@
 import { createContext, useContext, useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom"; // Import useNavigate
-import { jwtDecode } from "jwt-decode"; // Use named import
+import { useNavigate } from "react-router-dom";
+import { jwtDecode } from "jwt-decode";
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem("token"));
+  const [role, setRole] = useState(localStorage.getItem("role"));
   const [isLoggedIn, setIsLoggedIn] = useState(!!token);
-  const navigate = useNavigate(); // Use React Router navigation
+  const navigate = useNavigate();
 
-  // Function to check if token is expired
   const isTokenExpired = (token) => {
     if (!token) return true;
     try {
       const decoded = jwtDecode(token);
-      return decoded.exp * 1000 < Date.now(); // Convert exp from seconds to milliseconds
+      return decoded.exp * 1000 < Date.now();
     } catch (error) {
-      return true; // If decoding fails, treat it as expired
+      return true;
     }
   };
 
-  useEffect(() => {
-    if (isTokenExpired(token)) {
-      LogoutUser();
-    } else {
-      setIsLoggedIn(true);
-
-      // Auto logout when token expires
-      const decoded = jwtDecode(token);
-      const expiryTime = decoded.exp * 1000 - Date.now(); // Time left in milliseconds
-      const timeout = setTimeout(() => LogoutUser(), expiryTime);
-      
-      return () => clearTimeout(timeout); // Cleanup timer on unmount
-    }
-  }, [token]);
+  const LoginUser = (newToken, newRole) => {
+    localStorage.setItem("token", newToken);
+    localStorage.setItem("role", newRole);
+    setToken(newToken);
+    setRole(newRole);
+    setIsLoggedIn(true);
+  };
 
   const LogoutUser = () => {
-    console.log("Logging out...");
-    setToken(null);
-    setIsLoggedIn(false);
     localStorage.removeItem("token");
-    
-    // Redirect without page refresh
+    localStorage.removeItem("role");
+    setToken(null);
+    setRole(null);
+    setIsLoggedIn(false);
     navigate("/login");
   };
 
+  useEffect(() => {
+    if (token && isTokenExpired(token)) {
+      LogoutUser();
+    }
+  }, [token]);
+
   return (
-    <AuthContext.Provider value={{ token, isLoggedIn, setToken, LogoutUser }}>
+    <AuthContext.Provider value={{ 
+      token, 
+      role,
+      isLoggedIn, 
+      LoginUser, 
+      LogoutUser 
+    }}>
       {children}
     </AuthContext.Provider>
   );

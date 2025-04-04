@@ -6,14 +6,11 @@ const userSchema = new mongoose.Schema(
     name: {
       type: String,
       required: true,
-      trim: true
     },
     email: {
       type: String,
       required: true,
       unique: true,
-      trim: true,
-      lowercase: true
     },
     password: {
       type: String,
@@ -22,7 +19,6 @@ const userSchema = new mongoose.Schema(
     phone: {
       type: String,
       required: true,
-      trim: true
     },
     role: {
       type: String,
@@ -38,8 +34,7 @@ const userSchema = new mongoose.Schema(
       unique: function () {
         return this.role === "resident";
       },
-      sparse: true,
-      trim: true
+      sparse: true
     },
     approval_status: {
       type: String,
@@ -52,7 +47,6 @@ const userSchema = new mongoose.Schema(
       type: String,
       unique: true,
       sparse: true,
-      trim: true
     },
     profilePicture: {
       type: String,
@@ -78,14 +72,14 @@ userSchema.pre("save", async function (next) {
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
     next();
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    next(error);
   }
 });
 
-// Method to compare passwords
-userSchema.methods.comparePassword = async function (candidatePassword) {
-  return await bcrypt.compare(candidatePassword, this.password);
+// Compare passwords
+userSchema.methods.comparePasswords = async function (password) {
+  return bcrypt.compare(password, this.password);
 };
 
 module.exports = mongoose.model("User", userSchema);

@@ -3,50 +3,60 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const { sendOTP, verifyOTP } = require("../utils/otpSend");
 
+// Register with OTP verification
 exports.register = async (req, res) => {
   try {
-    const { name, email, password, role, flat_no, phone, otp, profilePicture, familyMembers } = req.body;
+    const { name, email, password, phone, otp, flat_no, role, profilePicture, familyMembers } = req.body;
 
-    if (!name || !email || !password || !phone || !role) {
-      return res.status(400).json({ 
+    // Basic validation
+    const requiredFields = { name, email, password, phone, role };
+    for (const [field, value] of Object.entries(requiredFields)) {
+      if (!value) {
+        return res.status(400).json({
+          success: false,
+          message: `${field} is required`
+        });
+      }
+    }
+
+    // Role-based validation
+    if (role === "resident" && !flat_no) {
+      return res.status(400).json({
         success: false,
-        message: "All required fields must be provided" 
+        message: "Flat number is required for residents"
       });
     }
 
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ 
+    // Check if user exists
+    const userExist = await User.findOne({ email });
+    if (userExist) {
+      return res.status(400).json({
         success: false,
-        message: "Email already registered" 
+        message: "Email already registered"
       });
     }
 
+    // Check flat number uniqueness for residents
     if (role === "resident") {
-      if (!flat_no) {
-        return res.status(400).json({ 
+      const flatExist = await User.findOne({ flat_no });
+      if (flatExist) {
+        return res.status(400).json({
           success: false,
-          message: "Flat number required for residents" 
-        });
-      }
-      const existingFlat = await User.findOne({ flat_no });
-      if (existingFlat) {
-        return res.status(400).json({ 
-          success: false,
-          message: "Flat is already registered" 
+          message: "Flat number already registered"
         });
       }
     }
 
+    // OTP handling
     if (!otp) {
       try {
         await sendOTP(email);
-        return res.json({ 
+        return res.json({
           success: true,
-          message: "OTP sent to email",
-          nextStep: "Verify OTP to complete registration"
+          message: "OTP sent to email"
         });
       } catch (error) {
+        console.error("OTP send error:", error);
         return res.status(500).json({
           success: false,
           message: "Failed to send OTP"
@@ -54,111 +64,144 @@ exports.register = async (req, res) => {
       }
     }
 
+    // Verify OTP
     if (!verifyOTP(email, otp)) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Invalid or expired OTP" 
+        message: "Invalid or expired OTP"
       });
     }
 
-    const newUser = new User({
+    // Create user (password will be hashed by pre-save hook)
+    const userCreated = await User.create({
       name,
       email,
-      password: await bcrypt.hash(password, 10),
-      role,
+      password,
       phone,
       flat_no: role === "resident" ? flat_no : undefined,
-      profilePicture: profilePicture || "",
-      familyMembers: familyMembers || [],
-      approval_status: role === "admin" ? "approved" : "pending"
+      role,
+      approval_status: ["admin", "security"].includes(role) ? "approved" : "pending",      profilePicture,
+      familyMembers
     });
 
-    await newUser.save();
-
-    let token = null;
-    if (newUser.approval_status === "approved") {
-      token = jwt.sign(
-        { userId: newUser._id, role: newUser.role },
+    // Generate token if approved
+    const token = userCreated.approval_status === "approved"
+      ? jwt.sign(
+        { userId: userCreated._id, role: userCreated.role },
         process.env.JWT_SECRET,
-        { expiresIn: "1h" }
-      );
-    }
+        { expiresIn: '1h' }
+      )
+      : null;
 
-    const userResponse = newUser.toObject();
-    delete userResponse.password;
+    // Prepare user response without sensitive data
+    const userResponse = {
+      _id: userCreated._id,
+      name: userCreated.name,
+      email: userCreated.email,
+      phone: userCreated.phone,
+      role: userCreated.role,
+      flat_no: userCreated.flat_no,
+      approval_status: userCreated.approval_status,
+      profilePicture: userCreated.profilePicture,
+      createdAt: userCreated.createdAt
+    };
 
     res.status(201).json({
       success: true,
-      message: role === "admin" ? "Admin registered" : "Pending approval",
+      message: "Registration successful",
       token,
       user: userResponse
     });
 
-  } catch (err) {
-    console.error("Registration error:", err);
-    res.status(500).json({ 
+  } catch (error) {
+    console.error("Registration error:", error);
+    res.status(500).json({
       success: false,
       message: "Registration failed",
-      error: err.message 
+      error: process.env.NODE_ENV === "development" ? error.message : undefined
     });
   }
 };
 
+// Login user
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    // Validate input
     if (!email || !password) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Email and password required" 
+        message: "Email and password required"
       });
     }
 
-    const user = await User.findOne({ email });
+    // Find user with password
+    const user = await User.findOne({ email }).select('+password');
     if (!user) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
-        message: "Invalid credentials" 
+        message: "Invalid credentials"
       });
     }
 
-    if (user.approval_status !== "approved") {
-      return res.status(403).json({ 
+    // Check approval status
+    if (user.approval_status !== 'approved') {
+      return res.status(403).json({
         success: false,
-        message: "Account not approved yet" 
+        message: "Account not approved yet",
+        approval_status: user.approval_status
       });
     }
 
-    const isMatch = await user.comparePassword(password);
+    // Compare passwords using model method
+    const isMatch = await user.comparePasswords(password);
     if (!isMatch) {
       return res.status(401).json({ 
-        success: false,
+        success: false, 
         message: "Invalid credentials" 
       });
     }
 
+    // Generate token
     const token = jwt.sign(
-      { userId: user._id, role: user.role },
+      {
+        userId: user._id,
+        role: user.role,
+        email: user.email
+      },
       process.env.JWT_SECRET,
-      { expiresIn: "1h" }
+      { expiresIn: '1h' }
     );
 
-    const userResponse = user.toObject();
-    delete userResponse.password;
+    // Prepare user response without sensitive data
+    const userResponse = {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      flat_no: user.flat_no,
+      approval_status: user.approval_status,
+      profilePicture: user.profilePicture,
+      familyMembers: user.familyMembers,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt
+    };
 
-    res.json({
+    res.status(200).json({
       success: true,
+      message: "Login Successful",
       token,
-      user: userResponse,
-      message: "Login successful"
+      user: userResponse
     });
 
   } catch (error) {
     console.error("Login error:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: "Login failed" 
+      message: "Login failed",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined
     });
   }
 };
@@ -168,31 +211,31 @@ exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
     if (!email) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Email required" 
+        message: "Email required"
       });
     }
 
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: "User not found" 
+        message: "User not found"
       });
     }
 
     await sendOTP(email);
-    res.json({ 
+    res.json({
       success: true,
-      message: "OTP sent for password reset" 
+      message: "OTP sent for password reset"
     });
 
   } catch (err) {
     console.error("Forgot password error:", err);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: "Failed to send OTP" 
+      message: "Failed to send OTP"
     });
   }
 };
@@ -201,99 +244,54 @@ exports.forgotPassword = async (req, res) => {
 exports.resetPassword = async (req, res) => {
   try {
     const { email, otp, newPassword } = req.body;
+
     if (!email || !otp || !newPassword) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Email, OTP and new password required" 
+        message: "Email, OTP, and new password required"
       });
     }
 
     // Verify OTP
     if (!verifyOTP(email, otp)) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Invalid or expired OTP" 
+        message: "Invalid or expired OTP"
       });
     }
 
-    // Update password
+    // Find user
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: "User not found" 
+        message: "User not found"
       });
     }
 
-    user.password = await bcrypt.hash(newPassword, 10);
+    // Check if new password is same as old
+    const isSamePassword = await bcrypt.compare(newPassword, user.password);
+    if (isSamePassword) {
+      return res.status(400).json({
+        success: false,
+        message: "New password cannot be same as old password"
+      });
+    }
+
+    // Update password (will be hashed by pre-save hook)
+    user.password = newPassword;
     await user.save();
 
-    // Return updated user data without password
-    const userResponse = user.toObject();
-    delete userResponse.password;
-
-    res.json({ 
+    res.json({
       success: true,
-      user: userResponse,
-      message: "Password reset successful" 
+      message: "Password reset successful. You can now log in with the new password."
     });
 
   } catch (err) {
     console.error("Reset password error:", err);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: "Password reset failed" 
-    });
-  }
-};
-
-// Change Password (for authenticated users)
-exports.changePassword = async (req, res) => {
-  try {
-    const { currentPassword, newPassword } = req.body;
-    const userId = req.user.userId;
-
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({ 
-        success: false,
-        message: "Current and new passwords required" 
-      });
-    }
-
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ 
-        success: false,
-        message: "User not found" 
-      });
-    }
-
-    const isMatch = await user.comparePassword(currentPassword);
-    if (!isMatch) {
-      return res.status(401).json({ 
-        success: false,
-        message: "Current password is incorrect" 
-      });
-    }
-
-    user.password = await bcrypt.hash(newPassword, 10);
-    await user.save();
-
-    // Return updated user data without password
-    const userResponse = user.toObject();
-    delete userResponse.password;
-
-    res.json({ 
-      success: true,
-      user: userResponse,
-      message: "Password changed successfully" 
-    });
-
-  } catch (err) {
-    console.error("Change password error:", err);
-    res.status(500).json({ 
-      success: false,
-      message: "Failed to change password" 
+      message: "Password reset failed"
     });
   }
 };
@@ -303,32 +301,29 @@ exports.verifyOTP = async (req, res) => {
   try {
     const { email, otp } = req.body;
     if (!email || !otp) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Email and OTP required" 
+        message: "Email and OTP required"
       });
     }
 
     if (!verifyOTP(email, otp)) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Invalid or expired OTP" 
+        message: "Invalid or expired OTP"
       });
     }
 
-    res.json({ 
+    res.json({
       success: true,
-      message: "OTP verified successfully" 
+      message: "OTP verified successfully"
     });
 
   } catch (err) {
     console.error("OTP verification error:", err);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: "OTP verification failed" 
+      message: "OTP verification failed"
     });
   }
 };
-
-
-
