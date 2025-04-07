@@ -8,7 +8,7 @@ const EmergencyAlertSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ["Fire", "Medical", "Security Threat", "Suspicious Person", "Unauthorized Entry", "Other"],
+    enum: ["Fire", "Security Threat", "Suspicious Person", "Unauthorized Entry", "Other"],
     required: true,
   },
   customTitle: {
@@ -27,19 +27,38 @@ const EmergencyAlertSchema = new mongoose.Schema({
   photo: {
     type: String, // URL to stored image
   },
-  timestamp: {
-    type: Date,
-    default: Date.now,
-  },
   status: {
     type: String,
     enum: ["Pending", "Processing", "Resolved"],
     default: "Pending",
   },
+  // New fields to track verification
+  verifiedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+  },
+  verifiedAt: {
+    type: Date,
+  },
+  actionTaken: {
+    type: String,
+  },
   repeatedAttempts: {
     type: Number,
     default: 0,
   },
-}, { timestamps: true });
+}, { 
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
+});
+
+// Virtual population
+EmergencyAlertSchema.virtual('verifier', {
+  ref: 'User',
+  localField: 'verifiedBy',
+  foreignField: '_id',
+  justOne: true
+});
 
 module.exports = mongoose.model("EmergencyAlert", EmergencyAlertSchema);

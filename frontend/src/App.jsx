@@ -35,6 +35,11 @@ function App() {
         <Route path="/resident-register" element={<ResidentSignup />} />
         <Route path="/admin-security-register" element={<AdminSecurityRegister />} />
 
+
+
+
+
+
         {/* Protected Routes */}
         <Route element={<ProtectedRoute />}>
           <Route path="/security/*" element={<SecurityRoutes />} />

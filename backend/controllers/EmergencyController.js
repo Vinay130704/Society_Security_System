@@ -7,7 +7,6 @@ exports.createAlert = async (req, res) => {
   try {
     const { type, customTitle, location, description, photo } = req.body;
     
-    // Validation
     if (!type || !location) {
       return res.status(400).json({ message: "Type and location are required" });
     }
@@ -39,7 +38,6 @@ exports.createAlert = async (req, res) => {
       }
     }
 
-    // Create new alert
     const alert = new EmergencyAlert({
       residentId: req.user.userId,
       type,
@@ -52,15 +50,12 @@ exports.createAlert = async (req, res) => {
 
     await alert.save();
 
-    // Notify security and admin via WebSocket
     getIO().emit("emergencyAlert", {
       message: "New emergency alert!",
       alert
     });
 
-    // Play alert sound
     playSoundAlert();
-
     res.status(201).json(alert);
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
@@ -76,6 +71,7 @@ exports.getAllAlerts = async (req, res) => {
 
     const alerts = await EmergencyAlert.find()
       .populate("residentId", "name email phone flat_no")
+      .populate("verifier", "name role") // Populate verifier info
       .sort({ createdAt: -1 });
 
     res.json(alerts);
@@ -86,16 +82,13 @@ exports.getAllAlerts = async (req, res) => {
 
 // Get resident's own alerts
 exports.getResidentAlerts = async (req, res) => {
-  console.log("getResidentAlerts triggered"); // Add this line
   try {
     const alerts = await EmergencyAlert.find({ residentId: req.user.userId })
+      .populate("verifier", "name role") // Populate verifier info
       .sort({ createdAt: -1 });
-    
-    console.log("Found alerts:", alerts); // Debug output
     
     res.json(alerts);
   } catch (error) {
-    console.error("Error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
@@ -107,16 +100,29 @@ exports.updateAlertStatus = async (req, res) => {
       return res.status(403).json({ message: "Access denied" });
     }
 
-    const { status } = req.body;
+    const { status, actionTaken } = req.body;
     if (!["Pending", "Processing", "Resolved"].includes(status)) {
       return res.status(400).json({ message: "Invalid status" });
     }
 
+    const updateData = {
+      status,
+      actionTaken
+    };
+
+    // Track who resolved and when
+    if (status === "Resolved") {
+      updateData.verifiedBy = req.user.userId;
+      updateData.verifiedAt = new Date();
+    }
+
     const alert = await EmergencyAlert.findByIdAndUpdate(
       req.params.id,
-      { status },
+      updateData,
       { new: true }
-    ).populate("residentId", "name email");
+    )
+    .populate("residentId", "name email")
+    .populate("verifier", "name role");
 
     if (!alert) {
       return res.status(404).json({ message: "Alert not found" });
@@ -124,8 +130,13 @@ exports.updateAlertStatus = async (req, res) => {
 
     // Notify resident of status change
     getIO().to(`user_${alert.residentId._id}`).emit("alertUpdate", {
-      message: `Your alert status has been updated to ${status}`,
-      alert
+      message: `Your alert has been marked as ${status}`,
+      alert: {
+        ...alert.toObject(),
+        verifiedByName: alert.verifier?.name,
+        verifiedByRole: alert.verifier?.role,
+        verificationTime: alert.verifiedAt
+      }
     });
 
     res.json(alert);
@@ -153,15 +164,33 @@ exports.triggerUnauthorizedEntry = async (req, res) => {
 
     await alert.save();
 
-    // Notify admin
     getIO().emit("emergencyAlert", {
       message: "Unauthorized entry detected!",
       alert
     });
 
     playSoundAlert();
-
     res.status(201).json(alert);
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+
+// Delete alert (Admin/Security only)
+exports.deleteAlert = async (req, res) => {
+  try {
+    if (req.user.role !== "admin" && req.user.role !== "security") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const alert = await EmergencyAlert.findByIdAndDelete(req.params.id);
+    
+    if (!alert) {
+      return res.status(404).json({ message: "Alert not found" });
+    }
+
+    res.json({ message: "Alert deleted successfully" });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }

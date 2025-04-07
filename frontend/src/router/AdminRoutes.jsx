@@ -7,6 +7,8 @@ import ManageResidents from "../pages/Admin/ManageResidents";
 import UserManagement from "../pages/Admin/UsersManagement";
 import VisitorLogs from "../pages/Admin/VisitorLogs";
 import ManageGuard from "../pages/Admin/ManageGuards";
+import SecurityReportPage from "../pages/Admin/SecurityReports";
+import EmergencyAlertsAdmin from "../pages/Admin/EmergencyView ";
 
 const AdminRoutes = () => {
   return (
@@ -20,6 +22,9 @@ const AdminRoutes = () => {
           <Route path="manage-residents" element={<ManageResidents />} />
           <Route path="visitor-log" element={<VisitorLogs />} />
           <Route path="guards" element={<ManageGuard />} />
+          <Route path="security-report" element={<SecurityReportPage />} />
+          <Route path="emergency-view" element={<EmergencyAlertsAdmin />} />
+
         </Routes>
       </div>
     </div>

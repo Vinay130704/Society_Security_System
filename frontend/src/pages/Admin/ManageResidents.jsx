@@ -23,6 +23,10 @@ const ResidentManagement = () => {
     flat: "all",
     sort: "newest"
   });
+  
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   useEffect(() => {
     fetchResidents();
@@ -198,6 +202,18 @@ const ResidentManagement = () => {
 
   // Get unique flats for filter
   const uniqueFlats = [...new Set(residents.map(resident => resident.flat_no).filter(Boolean))];
+  
+  // Pagination logic
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = sortedResidents.slice(indexOfFirstItem, indexOfLastItem);
+  
+  // Change page
+  const paginate = (pageNumber) => {
+    if (pageNumber > 0 && pageNumber <= Math.ceil(sortedResidents.length / itemsPerPage)) {
+      setCurrentPage(pageNumber);
+    }
+  };
 
   return (
     <div className="p-4 md:p-8 bg-background min-h-screen">
@@ -332,8 +348,8 @@ const ResidentManagement = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {sortedResidents.length > 0 ? (
-                    sortedResidents.map((resident) => (
+                  {currentItems.length > 0 ? (
+                    currentItems.map((resident) => (
                       <motion.tr 
                         key={resident._id}
                         initial={{ opacity: 0 }}
@@ -403,6 +419,44 @@ const ResidentManagement = () => {
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* Pagination */}
+        {!loading && filteredResidents.length > 0 && (
+          <div className="flex items-center justify-between mt-6">
+            <div className="text-sm text-gray-700">
+              Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{" "}
+              <span className="font-medium">
+                {Math.min(indexOfLastItem, filteredResidents.length)}
+              </span>{" "}
+              of <span className="font-medium">{filteredResidents.length}</span> results
+            </div>
+            <div className="flex gap-1">
+              <button
+                onClick={() => paginate(currentPage - 1)}
+                disabled={currentPage === 1}
+                className={`px-3 py-1 rounded-md ${currentPage === 1 ? "bg-gray-200 text-gray-500 cursor-not-allowed" : "bg-primary text-white hover:bg-primary-dark"}`}
+              >
+                Previous
+              </button>
+              {[...Array(Math.ceil(filteredResidents.length / itemsPerPage)).keys()].map((num) => (
+                <button
+                  key={num + 1}
+                  onClick={() => paginate(num + 1)}
+                  className={`px-3 py-1 rounded-md ${currentPage === num + 1 ? "bg-secondary text-white" : "bg-white text-primary hover:bg-gray-100"}`}
+                >
+                  {num + 1}
+                </button>
+              ))}
+              <button
+                onClick={() => paginate(currentPage + 1)}
+                disabled={indexOfLastItem >= filteredResidents.length}
+                className={`px-3 py-1 rounded-md ${indexOfLastItem >= filteredResidents.length ? "bg-gray-200 text-gray-500 cursor-not-allowed" : "bg-primary text-white hover:bg-primary-dark"}`}
+              >
+                Next
+              </button>
             </div>
           </div>
         )}

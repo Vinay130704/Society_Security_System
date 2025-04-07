@@ -6,18 +6,20 @@ const {
   getAllAlerts,
   getResidentAlerts,
   updateAlertStatus,
-  triggerUnauthorizedEntry
+  triggerUnauthorizedEntry,
+  deleteAlert
 } = require("../controllers/EmergencyController");
 
 // Resident endpoints
-router.post("/", authMiddleware, createAlert);
+router.post("/create-emergency", authMiddleware, createAlert);
 router.get("/my-alerts", authMiddleware, getResidentAlerts);
 
 // Security endpoints
 router.post("/unauthorized-entry", authMiddleware, triggerUnauthorizedEntry);
 
 // Admin/Security endpoints
-router.get("/all", authMiddleware, getAllAlerts); // Changed from "/" to "/all"
+router.get("/all-emergency-alerts", authMiddleware, getAllAlerts); // Changed from "/" to "/all"
 router.put("/:id/status", authMiddleware, updateAlertStatus);
+router.delete("/delete/:id", authMiddleware, deleteAlert);
 
 module.exports = router;

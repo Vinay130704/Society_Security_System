@@ -10,7 +10,13 @@ import {
   HardHat,
   ClipboardList,
   Settings,
-  Menu 
+  Menu,
+  Truck,
+  AlertTriangle,
+  CalendarRange,
+  LogIn,
+  Car,
+  UserCheck
 } from "lucide-react";
 
 const AdminLayout = () => {
@@ -23,7 +29,7 @@ const AdminLayout = () => {
   return (
     <div className="flex">
       {/* Sidebar */}
-      <div className={`bg-primary-dark text-white h-screen ${isOpen ? "w-64" : "w-16"} transition-all duration-300 p-4 sticky top-0`}>
+      <div className={`bg-primary-dark text-white h-screen ${isOpen ? "w-64" : "w-16"} transition-all duration-300 p-4 sticky top-0 overflow-y-auto`}>
         <button 
           onClick={toggleSidebar} 
           className="text-white mb-6 focus:outline-none hover:bg-primary-light/20 p-2 rounded-lg"
@@ -76,13 +82,78 @@ const AdminLayout = () => {
               {isOpen && <span>Visitor Logs</span>}
             </a>
           </li>
-          <li className="border-t border-primary-light/30 mt-4 pt-2">
+          
+          {/* New components added */}
+          <li>
             <a 
-              href="/admin/settings" 
+              href="/admin/delivery" 
               className="flex items-center gap-4 p-3 hover:bg-primary-light/20 rounded-lg transition-colors"
             >
-              <Settings size={20} />
-              {isOpen && <span>Settings</span>}
+              <Truck size={20} />
+              {isOpen && <span>Delivery</span>}
+            </a>
+          </li>
+          <li>
+            <a 
+              href="/admin/emergency" 
+              className="flex items-center gap-4 p-3 hover:bg-primary-light/20 rounded-lg transition-colors"
+            >
+              <AlertTriangle size={20} />
+              {isOpen && <span>Emergency</span>}
+            </a>
+          </li>
+          <li>
+            <a 
+              href="/admin/events" 
+              className="flex items-center gap-4 p-3 hover:bg-primary-light/20 rounded-lg transition-colors"
+            >
+              <CalendarRange size={20} />
+              {isOpen && <span>Events</span>}
+            </a>
+          </li>
+          <li>
+            <a 
+              href="/admin/entry-exit" 
+              className="flex items-center gap-4 p-3 hover:bg-primary-light/20 rounded-lg transition-colors"
+            >
+              <LogIn size={20} />
+              {isOpen && <span>Entry/Exit</span>}
+            </a>
+          </li>
+          <li>
+            <a 
+              href="/admin/staff" 
+              className="flex items-center gap-4 p-3 hover:bg-primary-light/20 rounded-lg transition-colors"
+            >
+              <UserCheck size={20} />
+              {isOpen && <span>Staff</span>}
+            </a>
+          </li>
+          <li>
+            <a 
+              href="/admin/vehicle" 
+              className="flex items-center gap-4 p-3 hover:bg-primary-light/20 rounded-lg transition-colors"
+            >
+              <Car size={20} />
+              {isOpen && <span>Vehicle</span>}
+            </a>
+          </li>
+          <li>
+            <a 
+              href="/admin/worker" 
+              className="flex items-center gap-4 p-3 hover:bg-primary-light/20 rounded-lg transition-colors"
+            >
+              <HardHat size={20} />
+              {isOpen && <span>Worker</span>}
+            </a>
+          </li>
+          <li>
+            <a 
+              href="/admin/security-report" 
+              className="flex items-center gap-4 p-3 hover:bg-primary-light/20 rounded-lg transition-colors"
+            >
+              <Bell size={20} />
+              {isOpen && <span>Security Report</span>}
             </a>
           </li>
         </ul>

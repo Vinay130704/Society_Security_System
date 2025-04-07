@@ -9,6 +9,7 @@ const Login = () => {
   const [loginData, setLoginData] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -24,27 +25,29 @@ const Login = () => {
       const response = await fetch("http://localhost:5000/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(loginData),
+        body: JSON.stringify({ ...loginData, rememberMe }),
       });
 
       const data = await response.json();
 
-      if (!response.ok || !data.success) {
+      if (!response.ok) {
         throw new Error(data.message || "Login failed");
       }
 
       toast.success("Login successful!");
 
       // Store token and role
-      if (auth?.LoginUser) {
+      if (auth?.login) {
+        auth.login(data.token, data.user.role);
+      } else if (auth?.LoginUser) {
         auth.LoginUser(data.token, data.user.role);
       }
 
       // Role-based redirection
       const dashboardPaths = {
         admin: "/admin/admin-dashboard",
-        resident: "/resident/dashboard",
-        security: "/security/dashboard"
+        resident: "/resident/resident-dashboard",
+        security: "/security/security-dashboard"
       };
 
       const redirectPath = dashboardPaths[data.user.role];
@@ -73,11 +76,7 @@ const Login = () => {
               <h1 className="text-3xl font-bold mb-2">Welcome to GuardianNet</h1>
               <p className="text-blue-100">Your community's security is our top priority</p>
               <div className="mt-8">
-                {/* <img
-                  src={LoginImage}
-                  alt="Security System"
-                  className="rounded-lg shadow-lg border-4 border-blue-300/30 object-cover h-64 w-full"
-                /> */}
+                {/* You need to import and use the LoginImage or remove this comment block */}
               </div>
             </div>
           </div>
@@ -134,6 +133,7 @@ const Login = () => {
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? (
                       <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />
@@ -150,6 +150,8 @@ const Login = () => {
                     id="remember-me"
                     name="remember-me"
                     type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
                     className="h-4 w-4 text-secondary focus:ring-secondary border-gray-300 rounded"
                   />
                   <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
@@ -159,7 +161,7 @@ const Login = () => {
 
                 <div className="text-sm">
                   <Link
-                    to="/forgot-password"
+                    to="/reset-password"
                     className="font-medium text-secondary hover:text-primary"
                   >
                     Forgot password?
