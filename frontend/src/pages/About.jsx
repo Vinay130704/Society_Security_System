@@ -1,5 +1,6 @@
 import aboutImage from "../assets/signup.jpeg";
 import { motion } from "framer-motion";
+import Footer from "../components/Footer";
 
 const AboutUs = () => {
   // Animation variants
@@ -27,6 +28,7 @@ const AboutUs = () => {
   };
 
   return (
+    <>
     <div className="min-h-screen bg-background px-6 pt-24"> {/* Added pt-24 for navbar spacing */}
       <div className="max-w-6xl w-full mx-auto py-12">
         {/* Main Card with animations */}
@@ -147,7 +149,10 @@ const AboutUs = () => {
           ))}
         </motion.div>
       </div>
+      
     </div>
+    <Footer />
+    </>
   );
 };
 

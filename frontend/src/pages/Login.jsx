@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../Context/AuthContext";
 import { toast } from "react-toastify";
 import { Shield, Lock, Mail, Eye, EyeOff } from "lucide-react";
+import Footer from "../components/Footer";
 
 const Login = () => {
   const auth = useAuth();
@@ -20,7 +21,7 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     try {
       const response = await fetch("http://localhost:5000/api/auth/login", {
         method: "POST",
@@ -66,7 +67,8 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <>
+    <div className="min-h-screen bg-background flex items-center justify-center px-4 pt-24 pb-8">
       <div className="w-full max-w-4xl bg-white rounded-xl shadow-2xl overflow-hidden">
         <div className="flex flex-col md:flex-row">
           {/* Left Side - Image */}
@@ -214,7 +216,10 @@ const Login = () => {
           </div>
         </div>
       </div>
+      
     </div>
+    <Footer />
+    </>
   );
 };
 

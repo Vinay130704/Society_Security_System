@@ -1,167 +1,145 @@
 import { useState } from "react";
 import { Outlet } from "react-router-dom";
 import { 
-  Home, 
-  Users, 
-  Shield, 
-  Bell, 
-  Calendar, 
-  UserCog, 
+  Home,
+  ShieldCheck,
+  UserCog,
   HardHat,
-  ClipboardList,
-  Settings,
-  Menu,
-  Truck,
   AlertTriangle,
+  Menu,
+  LogOut,
+  ChevronDown,
+  ChevronUp,
+  ClipboardList,
+  Truck,
   CalendarRange,
-  LogIn,
-  Car,
-  UserCheck
+  Users
 } from "lucide-react";
 
 const AdminLayout = () => {
   const [isOpen, setIsOpen] = useState(true);
+  const [usersOpen, setUsersOpen] = useState(false);
+  const [activeItem, setActiveItem] = useState("Dashboard");
 
   const toggleSidebar = () => {
     setIsOpen(!isOpen);
   };
 
+  const toggleUsersDropdown = () => {
+    setUsersOpen(!usersOpen);
+  };
+
+  const navItems = [
+    { name: "Dashboard", icon: Home, path: "/admin/dashboard" },
+    { name: "User Management", icon: Users, path: "/admin/user-management" },
+    { name: "Resident Logs", icon: ClipboardList, path: "/admin/resident-logs" },
+    { name: "Delivery Logs", icon: Truck, path: "/admin/delivery-logs" },
+    { name: "Emergency", icon: AlertTriangle, path: "/admin/emergency" },
+    { name: "Events", icon: CalendarRange, path: "/admin/events" },
+    { name: "Workers", icon: HardHat, path: "/admin/workers" }
+  ];
+
   return (
-    <div className="flex">
-      {/* Sidebar */}
-      <div className={`bg-primary-dark text-white h-screen ${isOpen ? "w-64" : "w-16"} transition-all duration-300 p-4 sticky top-0 overflow-y-auto`}>
-        <button 
-          onClick={toggleSidebar} 
-          className="text-white mb-6 focus:outline-none hover:bg-primary-light/20 p-2 rounded-lg"
+    <div className="flex flex-col h-screen">
+      {/* Main content with sidebar */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar - Removed overflow-y-auto */}
+        <div 
+          className={`bg-primary-dark text-white ${isOpen ? "w-64" : "w-20"} transition-all duration-300 flex-shrink-0 fixed top-0 left-0 h-full z-40 pt-16`}
         >
-          <Menu size={24} />
-        </button>
-        <ul className="space-y-2">
-          <li>
-            <a 
-              href="/admin/admin-dashboard" 
-              className="flex items-center gap-4 p-3 hover:bg-primary-light/20 rounded-lg transition-colors"
-            >
-              <Home size={20} />
-              {isOpen && <span>Dashboard</span>}
-            </a>
-          </li>
-          <li>
-            <a 
-              href="/admin/user-management" 
-              className="flex items-center gap-4 p-3 hover:bg-primary-light/20 rounded-lg transition-colors"
-            >
-              <Users size={20} />
-              {isOpen && <span>User Management</span>}
-            </a>
-          </li>
-          <li>
-            <a 
-              href="/admin/manage-residents" 
-              className="flex items-center gap-4 p-3 hover:bg-primary-light/20 rounded-lg transition-colors"
-            >
-              <UserCog size={20} />
-              {isOpen && <span>Residents</span>}
-            </a>
-          </li>
-          <li>
-            <a 
-              href="/admin/guards" 
-              className="flex items-center gap-4 p-3 hover:bg-primary-light/20 rounded-lg transition-colors"
-            >
-              <Shield size={20} />
-              {isOpen && <span>Security Guards</span>}
-            </a>
-          </li>
-          <li>
-            <a 
-              href="/admin/visitor-log" 
-              className="flex items-center gap-4 p-3 hover:bg-primary-light/20 rounded-lg transition-colors"
-            >
-              <ClipboardList size={20} />
-              {isOpen && <span>Visitor Logs</span>}
-            </a>
-          </li>
-          
-          {/* New components added */}
-          <li>
-            <a 
-              href="/admin/delivery" 
-              className="flex items-center gap-4 p-3 hover:bg-primary-light/20 rounded-lg transition-colors"
-            >
-              <Truck size={20} />
-              {isOpen && <span>Delivery</span>}
-            </a>
-          </li>
-          <li>
-            <a 
-              href="/admin/emergency" 
-              className="flex items-center gap-4 p-3 hover:bg-primary-light/20 rounded-lg transition-colors"
-            >
-              <AlertTriangle size={20} />
-              {isOpen && <span>Emergency</span>}
-            </a>
-          </li>
-          <li>
-            <a 
-              href="/admin/events" 
-              className="flex items-center gap-4 p-3 hover:bg-primary-light/20 rounded-lg transition-colors"
-            >
-              <CalendarRange size={20} />
-              {isOpen && <span>Events</span>}
-            </a>
-          </li>
-          <li>
-            <a 
-              href="/admin/entry-exit" 
-              className="flex items-center gap-4 p-3 hover:bg-primary-light/20 rounded-lg transition-colors"
-            >
-              <LogIn size={20} />
-              {isOpen && <span>Entry/Exit</span>}
-            </a>
-          </li>
-          <li>
-            <a 
-              href="/admin/staff" 
-              className="flex items-center gap-4 p-3 hover:bg-primary-light/20 rounded-lg transition-colors"
-            >
-              <UserCheck size={20} />
-              {isOpen && <span>Staff</span>}
-            </a>
-          </li>
-          <li>
-            <a 
-              href="/admin/vehicle" 
-              className="flex items-center gap-4 p-3 hover:bg-primary-light/20 rounded-lg transition-colors"
-            >
-              <Car size={20} />
-              {isOpen && <span>Vehicle</span>}
-            </a>
-          </li>
-          <li>
-            <a 
-              href="/admin/worker" 
-              className="flex items-center gap-4 p-3 hover:bg-primary-light/20 rounded-lg transition-colors"
-            >
-              <HardHat size={20} />
-              {isOpen && <span>Worker</span>}
-            </a>
-          </li>
-          <li>
-            <a 
-              href="/admin/security-report" 
-              className="flex items-center gap-4 p-3 hover:bg-primary-light/20 rounded-lg transition-colors"
-            >
-              <Bell size={20} />
-              {isOpen && <span>Security Report</span>}
-            </a>
-          </li>
-        </ul>
-      </div>
-      
-      {/* Main Content */}
-      <div className="flex-1 bg-background min-h-screen">
-        <Outlet /> {/* This will render the current route's component */}
+          <div className="p-4 h-full flex flex-col">
+            <div className="flex items-center justify-between mb-6">
+              {isOpen && <h2 className="text-xl font-bold">Admin Panel</h2>}
+              <button 
+                onClick={toggleSidebar} 
+                className="text-white focus:outline-none hover:bg-primary-light/20 p-2 rounded-lg"
+              >
+                <Menu size={24} className="shrink-0" />
+              </button>
+            </div>
+            
+            {/* Navigation - Removed overflow-y-auto */}
+            <div className="flex-1">
+              <ul className="space-y-2">
+                {navItems.map((item) => (
+                  <li key={item.name}>
+                    <a 
+                      href={item.path}
+                      onClick={() => setActiveItem(item.name)}
+                      className={`flex items-center p-3 rounded-lg transition-colors 
+                        ${activeItem === item.name 
+                          ? "bg-secondary text-white" 
+                          : "hover:bg-primary-light/20 text-white/90"}
+                        ${isOpen ? "gap-4" : "justify-center"}`}
+                    >
+                      <item.icon size={20} className="shrink-0" />
+                      {isOpen && <span className="truncate">{item.name}</span>}
+                    </a>
+                  </li>
+                ))}
+
+                {/* Users Dropdown */}
+                <li>
+                  <button
+                    onClick={toggleUsersDropdown}
+                    className={`flex items-center p-3 rounded-lg transition-colors w-full 
+                      ${usersOpen ? 'bg-primary-light/10' : ''}
+                      hover:bg-primary-light/20 ${isOpen ? "justify-between" : "justify-center"}`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <Users size={20} className="shrink-0" />
+                      {isOpen && <span>User </span>}
+                    </div>
+                    {isOpen && (usersOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />)}
+                  </button>
+                  
+                  {usersOpen && isOpen && (
+                    <ul className="ml-8 mt-2 space-y-2">
+                      <li>
+                        <a 
+                          href="/admin/residents" 
+                          className={`flex items-center p-2 rounded-lg transition-colors 
+                            ${activeItem === "Residents" ? "bg-secondary/70 text-white" : "hover:bg-primary-light/20 text-white/90"}`}
+                          onClick={() => setActiveItem("Residents")}
+                        >
+                          <UserCog size={16} className="shrink-0 mr-3" />
+                          <span>Residents</span>
+                        </a>
+                      </li>
+                      <li>
+                        <a 
+                          href="/admin/security-users" 
+                          className={`flex items-center p-2 rounded-lg transition-colors 
+                            ${activeItem === "Security Users" ? "bg-secondary/70 text-white" : "hover:bg-primary-light/20 text-white/90"}`}
+                          onClick={() => setActiveItem("Security Users")}
+                        >
+                          <ShieldCheck size={16} className="shrink-0 mr-3" />
+                          <span>Security Users</span>
+                        </a>
+                      </li>
+                    </ul>
+                  )}
+                </li>
+              </ul>
+            </div>
+            
+            {/* Logout */}
+            {/* <div className="mt-auto pt-4">
+              <a 
+                href="/logout" 
+                className={`flex items-center p-3 hover:bg-primary-light/20 rounded-lg transition-colors ${isOpen ? "gap-4" : "justify-center"}`}
+              >
+                <LogOut size={20} className="shrink-0" />
+                {isOpen && <span>Logout</span>}
+              </a>
+            </div> */}
+          </div>
+        </div>
+
+        {/* Main Content Area - Keep overflow-y-auto here for content scrolling */}
+        <div className={`flex-1 bg-background overflow-y-auto ${isOpen ? "ml-64" : "ml-20"} transition-all duration-300 pt-16`}>
+          <Outlet />
+        </div>
       </div>
     </div>
   );

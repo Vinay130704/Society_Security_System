@@ -1,6 +1,5 @@
 import { Routes, Route } from "react-router-dom";
 import Navbar from "./components/Navbar";
-import Footer from "./components/Footer";
 import HomePage from "./pages/Homepage";
 import FeaturesSection from "./components/FeaturesSection";
 import HowItWorks from "./components/HowItWorks";
@@ -21,6 +20,7 @@ function App() {
   return (
     <>
       <Navbar />
+      
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<HomePage />} />
@@ -47,7 +47,7 @@ function App() {
           <Route path="/admin/*" element={<AdminRoutes />} />
         </Route>
       </Routes>
-      <Footer />
+
     </>
   );
 }

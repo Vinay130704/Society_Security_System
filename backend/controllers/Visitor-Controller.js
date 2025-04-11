@@ -96,6 +96,43 @@ exports.scanQRCode = async (req, res) => {
   }
 };
 
+// Add these new methods to your existing visitorController
+
+// Search visitor by name
+exports.searchVisitorByName = async (req, res) => {
+  try {
+    const { name } = req.body;
+    const {flat_no} = req.user;
+    
+    if (!name) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Name is required" 
+      });
+    }
+
+    const visitors = await Visitor.find({ 
+      name: { $regex: name, $options: 'i' } 
+    }).populate("resident_id", "name email flat_no");
+
+    res.status(200).json({
+      success: true,
+      message: "Visitors found",
+      data: visitors
+    });
+
+  } catch (error) {
+    console.error("Search error:", error);
+    res.status(500).json({ 
+      success: false,
+      message: "Server error",
+      error: error.message 
+    });
+  }
+};
+
+
+
 // Security Guard Captures Image & Sends to Resident
 exports.captureVisitor = async (req, res) => {
   try {
@@ -189,7 +226,7 @@ exports.approveVisitor = async (req, res) => {
   }
 };
 
-// Mark Visitor Exit
+// security guard Mark Visitor Exit
 exports.exitVisitor = async (req, res) => {
   try {
     const { id } = req.params;

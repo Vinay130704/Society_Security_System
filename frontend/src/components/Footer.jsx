@@ -3,7 +3,7 @@ import { Shield, Mail, Phone, MapPin, Facebook, Twitter, Instagram, Linkedin } f
 
 const Footer = () => {
   return (
-    <footer className="bg-gradient-to-b from-primary to-primary-dark text-white pt-12 pb-6 px-4 sm:px-6 border-t border-primary-light/30">
+    <footer className="bg-gradient-to-b from-primary to-primary-dark text-white pt-12 pb-6 px-4 sm:px-6 border-t border-primary-light/30 relative z-10">
       <div className="max-w-7xl mx-auto">
         {/* Main Footer Content */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">

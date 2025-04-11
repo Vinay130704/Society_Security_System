@@ -9,7 +9,7 @@ router.put("/update-profile", authMiddleware, updateProfile);
 router.post("/picture", authMiddleware, updateProfilePicture);
 
 // Family member routes
-router.post('/add-family', authMiddleware, addFamilyMember);
+router.post('/add-familymember', authMiddleware, addFamilyMember);
 router.post("/edit-family", authMiddleware, updateFamilyMember);
 router.delete("/family/:memberId", authMiddleware, removeFamilyMember);
 

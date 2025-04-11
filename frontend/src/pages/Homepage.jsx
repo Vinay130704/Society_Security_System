@@ -4,6 +4,7 @@ import { Shield, Home, User, Lock } from "lucide-react";
 import HowItWorks from "../components/HowItWorks";
 import FeaturesSection from "../components/FeaturesSection";
 import UserRoles from "../components/UserRoles";
+import Footer from "../components/Footer";
 
 const HeroSection = () => {
   return (
@@ -126,6 +127,7 @@ const HeroSection = () => {
       <FeaturesSection />
       <HowItWorks />
       <UserRoles />
+      <Footer />
     </div>
   );
 };

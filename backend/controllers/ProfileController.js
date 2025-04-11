@@ -246,32 +246,30 @@ exports.addFamilyMember = async (req, res) => {
   }
 };
 
+// Update Family Member - Fixed Version
 exports.updateFamilyMember = async (req, res) => {
   try {
-    if (req.user.role !== "resident") {
-      return res.status(403).json({
-        success: false,
-        message: "Only residents can manage family members"
-      });
-    }
-
     const { memberId, name, relation, gender } = req.body;
+    
     if (!memberId) {
       return res.status(400).json({
         success: false,
-        message: "Member ID is required for update"
+        message: "Member ID is required"
       });
     }
 
     const user = await User.findById(req.user.userId);
     if (!user) {
-      return res.status(404).json({
+      return res.status(404).json({ 
         success: false,
-        message: "User not found"
+        message: "User not found" 
       });
     }
 
-    const memberIndex = user.familyMembers.findIndex(m => m._id.toString() === memberId);
+    const memberIndex = user.familyMembers.findIndex(
+      m => m._id.toString() === memberId
+    );
+    
     if (memberIndex === -1) {
       return res.status(404).json({
         success: false,
@@ -279,15 +277,24 @@ exports.updateFamilyMember = async (req, res) => {
       });
     }
 
+    // Update fields
     if (name) user.familyMembers[memberIndex].name = name;
     if (relation) user.familyMembers[memberIndex].relation = relation;
     if (gender) user.familyMembers[memberIndex].gender = gender;
+    
+    // Handle file upload if provided
+    if (req.file) {
+      user.familyMembers[memberIndex].profilePicture = 
+        req.file.path.replace(/\\/g, "/");
+    }
 
     await user.save();
+
     res.status(200).json({
       success: true,
-      message: "Family member updated",
-      familyMember: user.familyMembers[memberIndex]
+      message: "Family member updated successfully",
+      updatedMember: user.familyMembers[memberIndex],
+      familyMembers: user.familyMembers
     });
   } catch (error) {
     console.error("Update family member error:", error);
@@ -299,38 +306,43 @@ exports.updateFamilyMember = async (req, res) => {
   }
 };
 
+// Remove Family Member - Fixed Version
 exports.removeFamilyMember = async (req, res) => {
   try {
-    if (req.user.role !== "resident") {
-      return res.status(403).json({
+    const { memberId } = req.params;
+    
+    if (!memberId) {
+      return res.status(400).json({
         success: false,
-        message: "Only residents can manage family members"
+        message: "Member ID is required"
       });
     }
 
-    const { memberId } = req.params;
     const user = await User.findById(req.user.userId);
     if (!user) {
-      return res.status(404).json({
+      return res.status(404).json({ 
         success: false,
-        message: "User not found"
+        message: "User not found" 
       });
     }
 
-    const memberIndex = user.familyMembers.findIndex(m => m._id.toString() === memberId);
-    if (memberIndex === -1) {
+    const initialLength = user.familyMembers.length;
+    user.familyMembers = user.familyMembers.filter(
+      m => m._id.toString() !== memberId
+    );
+    
+    if (user.familyMembers.length === initialLength) {
       return res.status(404).json({
         success: false,
         message: "Family member not found"
       });
     }
 
-    user.familyMembers.splice(memberIndex, 1);
     await user.save();
 
     res.status(200).json({
       success: true,
-      message: "Family member removed",
+      message: "Family member removed successfully",
       familyMembers: user.familyMembers
     });
   } catch (error) {

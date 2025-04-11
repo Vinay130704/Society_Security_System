@@ -9,7 +9,6 @@ const Navbar = () => {
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -24,8 +23,8 @@ const Navbar = () => {
   }, []);
 
   return (
-    <nav className="bg-gradient-to-r from-primary to-primary-dark text-white fixed w-full top-0 shadow-lg z-50 border-b border-primary-light/20">
-      <div className="container mx-auto px-4 sm:px-6 py-3 flex justify-between items-center">
+    <nav className="bg-gradient-to-r from-primary to-primary-dark text-white fixed w-full top-0 left-0 shadow-lg z-50 border-b border-primary-light/20 h-16">
+      <div className="container mx-auto px-4 sm:px-6 py-3 flex justify-between items-center h-full">
         {/* Logo/Brand */}
         <Link to="/" className="flex items-center space-x-2 group">
           <Shield className="h-8 w-8 text-secondary group-hover:text-white transition-colors" />
@@ -48,18 +47,6 @@ const Navbar = () => {
           >
             About
           </NavLink>
-          {/* <NavLink 
-            to="/alerts" 
-            className={({isActive}) => `px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive ? 'bg-primary-light/50 text-white' : 'text-gray-200 hover:text-white hover:bg-primary-light/30'}`}
-          >
-            Alerts
-          </NavLink>
-          <NavLink 
-            to="/settings" 
-            className={({isActive}) => `px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive ? 'bg-primary-light/50 text-white' : 'text-gray-200 hover:text-white hover:bg-primary-light/30'}`}
-          >
-            Settings
-          </NavLink> */}
 
           {isLoggedIn ? (
             <div className="flex items-center space-x-4 ml-4">
@@ -164,20 +151,6 @@ const Navbar = () => {
             >
               About
             </NavLink>
-            {/* <NavLink 
-              to="/alerts" 
-              className="block px-3 py-2 rounded-md text-base font-medium text-gray-200 hover:text-white hover:bg-primary-light/30"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              Alerts
-            </NavLink>
-            <NavLink 
-              to="/settings" 
-              className="block px-3 py-2 rounded-md text-base font-medium text-gray-200 hover:text-white hover:bg-primary-light/30"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              Settings
-            </NavLink> */}
 
             {isLoggedIn ? (
               <>

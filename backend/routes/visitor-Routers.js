@@ -37,6 +37,7 @@ router.get("/deny/:id", authMiddleware, visitorController.denyVisitor);
 router.post("/scan", authMiddleware, visitorController.scanQRCode);
 router.post("/capture", upload.single('image'), visitorController.captureVisitor);
 router.post("/exit/:id", authMiddleware, visitorController.exitVisitor);
+router.post("/search-by-name", authMiddleware, visitorController.searchVisitorByName);
 
 // Admin/Reporting routes
 router.get("/logs", authMiddleware, visitorController.getAllVisitorLogs);
