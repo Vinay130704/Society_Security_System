@@ -29,7 +29,6 @@ const SecurityVisitorScan = () => {
   const [logsLoading, setLogsLoading] = useState(false);
   const [isUnregisteredFlow, setIsUnregisteredFlow] = useState(false);
   const [pendingApprovals, setPendingApprovals] = useState([]);
-  const [exitingVisitorId, setExitingVisitorId] = useState(null);
 
   const API_BASE_URL = 'http://localhost:5000/api';
   const webcamRef = useRef(null);
@@ -189,9 +188,11 @@ const SecurityVisitorScan = () => {
 
     setLoading(true);
     try {
+      // Convert the base64 image to a blob
       const blob = dataURLtoBlob(capturedImage);
       const imageFile = new File([blob], "visitor_image.jpg", { type: "image/jpeg" });
 
+      // Create form data to send the file
       const formData = new FormData();
       formData.append('image', imageFile);
       formData.append('name', visitorDetails.name);
@@ -199,6 +200,7 @@ const SecurityVisitorScan = () => {
       formData.append('flat_no', visitorDetails.flat_no);
       formData.append('purpose', visitorDetails.purpose || 'Visit');
 
+      // Get token for authorization
       const token = localStorage.getItem('token');
       
       const response = await axios.post(
@@ -257,54 +259,17 @@ const SecurityVisitorScan = () => {
   };
 
   const handleExitVisitor = async (visitorId) => {
-    setExitingVisitorId(visitorId);
     try {
-      const response = await axios.post(
+      await axios.post(
         `${API_BASE_URL}/visitor/exit/${visitorId}`,
         {},
         getAuthHeaders()
       );
-      
-      if (response.data.success) {
-        toast.success('Exit recorded successfully');
-        
-        // Update visitor logs state
-        setVisitorLogs(prevLogs => 
-          prevLogs.map(log => 
-            log._id === visitorId 
-              ? { 
-                  ...log, 
-                  exit_time: new Date().toISOString(), 
-                  entry_status: 'exit' 
-                }
-              : log
-          )
-        );
-        
-        // Update current visitor details if being viewed
-        if (scanResult?.data?._id === visitorId) {
-          setScanResult(prev => ({
-            ...prev,
-            data: {
-              ...prev.data,
-              exit_time: new Date().toISOString(),
-              entry_status: 'exit'
-            }
-          }));
-          setVisitorDetails(prev => ({
-            ...prev,
-            exit_time: new Date().toISOString(),
-            entry_status: 'exit'
-          }));
-        }
-      } else {
-        throw new Error(response.data.message || 'Failed to record exit');
-      }
+      toast.success('Exit recorded successfully');
+      fetchVisitorLogs();
     } catch (error) {
       console.error('Exit error:', error);
       toast.error(error.response?.data?.message || 'Failed to record exit');
-    } finally {
-      setExitingVisitorId(null);
     }
   };
 
@@ -455,7 +420,6 @@ const SecurityVisitorScan = () => {
                       className={`w-full py-2 rounded-lg flex items-center justify-center gap-2 ${
                         isScanningQR ? 'bg-red-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'
                       }`}
-                      disabled={loading}
                     >
                       {isScanningQR ? 'Stop Camera' : 'Use Webcam Scanner'}
                     </button>
@@ -621,7 +585,7 @@ const SecurityVisitorScan = () => {
                     </div>
                   )}
 
-                  {/* Camera Section */}
+                  {/* Camera Section - Both for unregistered visitors and QR-scanned visitors */}
                   {(showCamera || isUnregisteredFlow) && (
                     <div className="space-y-4">
                       <div className="border-2 border-gray-300 rounded-lg overflow-hidden">
@@ -753,16 +717,12 @@ const SecurityVisitorScan = () => {
                               {visitor.exit_time ? new Date(visitor.exit_time).toLocaleString() : '-'}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                              {['Checked In', 'granted'].includes(visitor.entry_status) && !visitor.exit_time && (
+                              {['Checked In', 'granted'].includes(visitor.entry_status) && (
                                 <button
                                   onClick={() => handleExitVisitor(visitor._id)}
-                                  disabled={exitingVisitorId === visitor._id}
-                                  className={`text-blue-600 hover:text-blue-900 mr-3 flex items-center gap-1 ${
-                                    exitingVisitorId === visitor._id ? 'opacity-50 cursor-not-allowed' : ''
-                                  }`}
+                                  className="text-blue-600 hover:text-blue-900 mr-3 flex items-center gap-1"
                                 >
-                                  <LogOut size={14} /> 
-                                  {exitingVisitorId === visitor._id ? 'Processing...' : 'Mark Exit'}
+                                  <LogOut size={14} /> Mark Exit
                                 </button>
                               )}
                               {visitor.image && (

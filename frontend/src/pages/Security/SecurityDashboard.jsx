@@ -1,3 +1,6 @@
+import { useState, useEffect } from 'react';
+import axios from 'axios';
+import { toast } from 'react-toastify';
 import { 
   AlertCircle, 
   Shield, 
@@ -20,41 +23,107 @@ ChartJS.register(
   BarElement
 );
 
+// Mock data to use when backend is not available
+const mockDashboardData = {
+  stats: [
+    { title: "Active Alerts", value: "5", change: "+2 today" },
+    { title: "Visitors Today", value: "24", change: "8 expected" },
+    { title: "Vehicles Logged", value: "18", change: "3 deliveries" },
+    { title: "Staff On Duty", value: "7", change: "2 on patrol" }
+  ],
+  visitorChart: {
+    hours: ['6AM', '9AM', '12PM', '3PM', '6PM', '9PM'],
+    counts: [2, 8, 12, 6, 4, 1]
+  },
+  recentActivities: [
+    { id: 1, type: "unauthorized", message: "Unauthorized entry attempt", location: "North Gate", timestamp: new Date() },
+    { id: 2, type: "visit", message: "Visitor checked in", location: "Main Entrance", timestamp: new Date(Date.now() - 25*60*1000) }
+  ],
+  activeAlerts: [
+    { id: 1, message: "Fire alarm triggered", location: "East Wing", priority: "high", timestamp: new Date(Date.now() - 2*60*1000) }
+  ],
+  currentShift: {
+    startTime: "7:00 AM",
+    endTime: "3:00 PM",
+    teamMembers: ["Rajesh", "Amit", "Priya"],
+    assignedZones: ["North Gate", "East Wing"]
+  }
+};
+
 const SecurityDashboard = () => {
-  // Sample data
-  const stats = [
-    { title: "Active Alerts", value: "5", icon: <AlertCircle className="text-red-500" />, change: "+2 today" },
-    { title: "Visitors Today", value: "24", icon: <UserCheck className="text-secondary" />, change: "8 expected" },
-    { title: "Vehicles Logged", value: "18", icon: <Car className="text-primary-light" />, change: "3 deliveries" },
-    { title: "Staff On Duty", value: "7", icon: <Shield className="text-primary" />, change: "2 on patrol" }
-  ];
+  const [dashboardData, setDashboardData] = useState(mockDashboardData);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [useBackend, setUseBackend] = useState(false);
+  
+  const API_BASE_URL = 'http://localhost:5000/api';
+  const authToken = localStorage.getItem('token');
 
-  const recentActivities = [
-    { id: 1, action: "Unauthorized entry attempt", time: "10 mins ago", location: "North Gate" },
-    { id: 2, action: "Visitor checked in", time: "25 mins ago", location: "Main Entrance" },
-    { id: 3, action: "Fire alarm test", time: "1 hour ago", location: "East Wing" },
-    { id: 4, action: "Vehicle logged", time: "2 hours ago", location: "Parking Lot" }
-  ];
+  const getAuthHeaders = () => ({
+    headers: { Authorization: `Bearer ${authToken}` }
+  });
 
-  const quickActions = [
-    { title: "Gate Lockdown", icon: <Lock size={20} />, action: () => handleLockdown(), color: "bg-red-500 hover:bg-red-600" },
-    { title: "Report Incident", icon: <Siren size={20} />, action: () => reportIncident(), color: "bg-yellow-500 hover:bg-yellow-600" },
-    { title: "Unauthorized Entry", icon: <UserX size={20} />, action: () => logUnauthorizedEntry(), color: "bg-secondary hover:bg-secondary-dark" },
-    { title: "Scan QR Code", icon: <QrCode size={20} />, action: () => openScanner(), color: "bg-primary hover:bg-primary-dark" }
-  ];
+  // Fetch dashboard data from your backend
+  const fetchDashboardData = async () => {
+    if (!useBackend) {
+      setDashboardData(mockDashboardData);
+      return;
+    }
 
-  // Visitor data for bar chart
-  const visitorData = {
-    labels: ['6AM', '9AM', '12PM', '3PM', '6PM', '9PM'],
-    datasets: [
-      {
-        label: 'Visitors',
-        data: [2, 8, 12, 6, 4, 1],
-        backgroundColor: '#3498DB',
-        borderRadius: 4,
-      }
-    ]
+    try {
+      setLoading(true);
+      
+      // TODO: Replace with your actual endpoint
+      // Example: const response = await axios.get(`${API_BASE_URL}/your-endpoint`, getAuthHeaders());
+      // setDashboardData(response.data);
+      
+      // For now, we'll use mock data
+      setDashboardData(mockDashboardData);
+      
+    } catch (err) {
+      console.error('Failed to fetch dashboard data:', err);
+      setError('Failed to load dashboard data');
+      setDashboardData(mockDashboardData); // Fallback to mock data
+    } finally {
+      setLoading(false);
+    }
   };
+
+  // Handler functions
+  const handleLockdown = async () => {
+    try {
+      // TODO: Replace with your actual lockdown endpoint
+      // await axios.post(`${API_BASE_URL}/security/lockdown`, {}, getAuthHeaders());
+      toast.success('Lockdown initiated successfully (demo)');
+      fetchDashboardData();
+    } catch (err) {
+      toast.error('Failed to initiate lockdown (demo)');
+    }
+  };
+
+  const reportIncident = async () => {
+    toast.info("Incident reporting would open a form (demo)");
+  };
+
+  const logUnauthorizedEntry = async () => {
+    toast.success('Unauthorized entry logged (demo)');
+  };
+
+  const openScanner = () => {
+    toast.info("QR scanner would open (demo)");
+  };
+
+  const acknowledgeAlert = async (alertId) => {
+    toast.success(`Alert ${alertId} acknowledged (demo)`);
+  };
+
+  // Quick actions
+  const quickActions = [
+    { title: "Gate Lockdown", icon: <Lock size={20} />, action: handleLockdown, color: "bg-red-500 hover:bg-red-600" },
+    { title: "Report Incident", icon: <Siren size={20} />, action: reportIncident, color: "bg-yellow-500 hover:bg-yellow-600" },
+    { title: "Unauthorized Entry", icon: <UserX size={20} />, action: logUnauthorizedEntry, color: "bg-secondary hover:bg-secondary-dark" },
+    { title: "Scan QR Code", icon: <QrCode size={20} />, action: openScanner, color: "bg-primary hover:bg-primary-dark" }
+  ];
 
   // Chart options
   const barOptions = {
@@ -79,31 +148,37 @@ const SecurityDashboard = () => {
     }
   };
 
-  // Handler functions
-  const handleLockdown = () => {
-    // Implement lockdown logic
-    alert("Initiating building lockdown procedure!");
-  };
+  useEffect(() => {
+    fetchDashboardData();
+  }, [useBackend]);
 
-  const reportIncident = () => {
-    // Implement incident reporting
-    alert("Opening incident report form");
-  };
-
-  const logUnauthorizedEntry = () => {
-    // Implement unauthorized entry logging
-    alert("Logging unauthorized entry attempt");
-  };
-
-  const openScanner = () => {
-    // Implement QR scanner
-    alert("Opening QR code scanner");
-  };
+  if (loading) {
+    return (
+      <div className="p-6 bg-background min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-primary-dark">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 bg-background min-h-screen">
-      {/* Added top margin and removed scroll */}
       <div className="mt-12">
+        {/* Demo mode toggle */}
+        <div className="mb-4 p-2 bg-blue-50 rounded-lg flex justify-between items-center">
+          <span className="text-sm text-blue-700">
+            {useBackend ? "Using backend data" : "Using demo data"}
+          </span>
+          <button
+            onClick={() => setUseBackend(!useBackend)}
+            className="px-3 py-1 bg-blue-100 text-blue-700 rounded text-sm hover:bg-blue-200"
+          >
+            {useBackend ? "Switch to Demo" : "Connect to Backend"}
+          </button>
+        </div>
+
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-primary-dark">Security Dashboard</h1>
@@ -114,20 +189,28 @@ const SecurityDashboard = () => {
         </div>
 
         {/* Emergency Alert Banner */}
-        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-r-lg flex items-center">
-          <Siren className="mr-3 animate-pulse" />
-          <div>
-            <p className="font-bold">Emergency Alert: Fire alarm triggered in East Wing</p>
-            <p className="text-sm">2 minutes ago • Priority: High</p>
+        {dashboardData.activeAlerts?.find(a => a.priority === 'high') && (
+          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-r-lg flex items-center">
+            <Siren className="mr-3 animate-pulse" />
+            <div>
+              <p className="font-bold">Emergency Alert: {dashboardData.activeAlerts.find(a => a.priority === 'high').message}</p>
+              <p className="text-sm">
+                {new Date(dashboardData.activeAlerts.find(a => a.priority === 'high').timestamp).toLocaleTimeString()} • 
+                Priority: High
+              </p>
+            </div>
+            <button 
+              onClick={() => acknowledgeAlert(dashboardData.activeAlerts.find(a => a.priority === 'high').id)}
+              className="ml-auto bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600"
+            >
+              Acknowledge
+            </button>
           </div>
-          <button className="ml-auto bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600">
-            Acknowledge
-          </button>
-        </div>
+        )}
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {stats.map((stat, index) => (
+          {dashboardData.stats?.map((stat, index) => (
             <div 
               key={index}
               className="bg-white rounded-xl shadow-lg p-6 transform transition-all hover:-translate-y-1 hover:shadow-xl"
@@ -139,7 +222,10 @@ const SecurityDashboard = () => {
                   <p className="text-xs text-gray-400 mt-1">{stat.change}</p>
                 </div>
                 <div className="p-3 bg-primary-light/10 rounded-lg">
-                  {stat.icon}
+                  {stat.title.includes('Alert') ? <AlertCircle className="text-red-500" /> :
+                   stat.title.includes('Visitor') ? <UserCheck className="text-secondary" /> :
+                   stat.title.includes('Vehicle') ? <Car className="text-primary-light" /> :
+                   <Shield className="text-primary" />}
                 </div>
               </div>
             </div>
@@ -151,32 +237,47 @@ const SecurityDashboard = () => {
           {/* Charts Section */}
           <div className="lg:col-span-2 space-y-6">
             {/* Visitors Chart */}
-            <div className="bg-white rounded-xl shadow-lg p-6 transform transition-all hover:shadow-xl">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-semibold text-primary-dark">Hourly Visitor Traffic</h2>
-                <button className="text-xs text-secondary flex items-center">
-                  View logs <ClipboardList size={14} className="ml-1" />
-                </button>
+            {dashboardData.visitorChart && (
+              <div className="bg-white rounded-xl shadow-lg p-6 transform transition-all hover:shadow-xl">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-lg font-semibold text-primary-dark">Hourly Visitor Traffic</h2>
+                  <button className="text-xs text-secondary flex items-center">
+                    View logs <ClipboardList size={14} className="ml-1" />
+                  </button>
+                </div>
+                <div className="h-64">
+                  <Bar 
+                    data={{
+                      labels: dashboardData.visitorChart.hours,
+                      datasets: [{
+                        label: 'Visitors',
+                        data: dashboardData.visitorChart.counts,
+                        backgroundColor: '#3498DB',
+                        borderRadius: 4,
+                      }]
+                    }} 
+                    options={barOptions} 
+                  />
+                </div>
               </div>
-              <div className="h-64">
-                <Bar data={visitorData} options={barOptions} />
-              </div>
-            </div>
+            )}
 
-            {/* Recent Alerts */}
+            {/* Recent Activities */}
             <div className="bg-white rounded-xl shadow-lg p-6 transform transition-all hover:shadow-xl">
               <h2 className="text-lg font-semibold text-primary-dark mb-4">Recent Security Events</h2>
               <div className="space-y-4">
-                {recentActivities.map(activity => (
+                {dashboardData.recentActivities?.map(activity => (
                   <div key={activity.id} className="flex items-start pb-3 border-b border-gray-100 last:border-0">
                     <div className={`p-2 rounded-full mr-3 ${
-                      activity.action.includes("unauthorized") ? "bg-red-100 text-red-500" : "bg-primary-light/10 text-primary"
+                      activity.type === 'unauthorized' ? "bg-red-100 text-red-500" : "bg-primary-light/10 text-primary"
                     }`}>
                       <AlertCircle size={16} />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-primary-dark">{activity.action}</p>
-                      <p className="text-xs text-gray-500">{activity.location} • {activity.time}</p>
+                      <p className="text-sm font-medium text-primary-dark">{activity.message}</p>
+                      <p className="text-xs text-gray-500">
+                        {activity.location} • {new Date(activity.timestamp).toLocaleTimeString()}
+                      </p>
                     </div>
                   </div>
                 ))}
@@ -207,24 +308,33 @@ const SecurityDashboard = () => {
 
             {/* Active Alerts */}
             <div className="bg-white rounded-xl shadow-lg p-6 transform transition-all hover:shadow-xl">
-              <h2 className="text-lg font-semibold text-primary-dark mb-4">Active Alerts (3)</h2>
+              <h2 className="text-lg font-semibold text-primary-dark mb-4">
+                Active Alerts ({dashboardData.activeAlerts?.length || 0})
+              </h2>
               <div className="space-y-3">
-                <div className="p-3 bg-red-50 rounded-lg border-l-4 border-red-500">
-                  <p className="text-sm font-medium text-primary-dark">Fire Alarm - East Wing</p>
-                  <p className="text-xs text-gray-500 mb-2">Triggered 2 mins ago • Priority: High</p>
-                  <div className="flex space-x-2">
-                    <button className="text-xs bg-secondary text-white px-3 py-1 rounded">Respond</button>
-                    <button className="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded">False Alarm</button>
+                {dashboardData.activeAlerts?.map(alert => (
+                  <div 
+                    key={alert.id} 
+                    className={`p-3 rounded-lg border-l-4 ${
+                      alert.priority === 'high' ? 'bg-red-50 border-red-500' :
+                      alert.priority === 'medium' ? 'bg-yellow-50 border-yellow-500' :
+                      'bg-blue-50 border-blue-500'
+                    }`}
+                  >
+                    <p className="text-sm font-medium text-primary-dark">{alert.message}</p>
+                    <p className="text-xs text-gray-500 mb-2">
+                      {alert.location} • {new Date(alert.timestamp).toLocaleTimeString()} • Priority: {alert.priority}
+                    </p>
+                    <div className="flex space-x-2">
+                      <button 
+                        onClick={() => acknowledgeAlert(alert.id)}
+                        className="text-xs bg-secondary text-white px-3 py-1 rounded"
+                      >
+                        Acknowledge
+                      </button>
+                    </div>
                   </div>
-                </div>
-                <div className="p-3 bg-yellow-50 rounded-lg border-l-4 border-yellow-500">
-                  <p className="text-sm font-medium text-primary-dark">Unauthorized Entry Attempt</p>
-                  <p className="text-xs text-gray-500 mb-2">North Gate • 15 mins ago</p>
-                  <div className="flex space-x-2">
-                    <button className="text-xs bg-secondary text-white px-3 py-1 rounded">Review</button>
-                    <button className="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded">Dismiss</button>
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
 
@@ -233,15 +343,21 @@ const SecurityDashboard = () => {
               <h2 className="text-lg font-semibold text-primary-dark mb-4">Current Shift</h2>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm text-gray-500">Duration:</span>
-                <span className="text-sm font-medium">7:00 AM - 3:00 PM</span>
+                <span className="text-sm font-medium">
+                  {dashboardData.currentShift?.startTime || 'N/A'} - {dashboardData.currentShift?.endTime || 'N/A'}
+                </span>
               </div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm text-gray-500">Team:</span>
-                <span className="text-sm font-medium">Rajesh, Amit, Priya</span>
+                <span className="text-sm font-medium">
+                  {dashboardData.currentShift?.teamMembers?.join(', ') || 'Not assigned'}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-500">Zone:</span>
-                <span className="text-sm font-medium">North Gate & East Wing</span>
+                <span className="text-sm font-medium">
+                  {dashboardData.currentShift?.assignedZones?.join(', ') || 'Not assigned'}
+                </span>
               </div>
             </div>
           </div>
