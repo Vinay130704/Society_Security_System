@@ -5,6 +5,11 @@ import ResidentLayout from "../components/ResidentSidebar";
 import ResidentDashboard from "../pages/Resident/ResidentDashboard";
 import ProfileEdit from "../pages/Resident/Profileedit";
 import ResidentVisitor from "../pages/Resident/VisitorRegister";
+import Delivery from "../pages/Resident/Delivery";
+import EmergencyAlert from "../pages/Resident/Emergency";
+import ResidentEvents from "../pages/Resident/Events";
+import ResidentStaff from "../pages/Resident/ResidentStaff";
+import ResidentVehicle from "../pages/Resident/ResidentVechile";
 
 const ResidentRoutes = () => {
   return (
@@ -13,6 +18,11 @@ const ResidentRoutes = () => {
         <Route path="resident-dashboard" element={<ResidentDashboard />} />
         <Route path="resident-profile" element={<ProfileEdit />} />
         <Route path="resident-visitor" element={<ResidentVisitor />} />
+        <Route path="resident-delivery" element={<Delivery />} />
+        <Route path="resident-emergency" element={<EmergencyAlert />} />
+        <Route path="resident-events" element={<ResidentEvents />} />
+        <Route path="resident-staff" element={<ResidentStaff />} />
+        <Route path="resident-vehicle" element={<ResidentVehicle />} />
       </Route>
     </Routes>
   );

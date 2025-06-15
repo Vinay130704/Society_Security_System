@@ -28,23 +28,30 @@ const upload = multer({
   }
 });
 
-// Resident routes
-router.post("/invite", authMiddleware, visitorController.inviteVisitor);
-router.get("/approve/:id", authMiddleware, visitorController.approveVisitor);
-router.get("/deny/:id", authMiddleware, visitorController.denyVisitor);
+// QR Code Routes
+router.get('/qr/:qr_data', visitorController.getQRCode);
+router.get('/:id/download-qr', authMiddleware, visitorController.downloadQRCode);
 
-// Security routes
-router.post("/scan", authMiddleware, visitorController.scanQRCode);
-router.post("/capture", upload.single('image'), visitorController.captureVisitor);
-router.post("/exit/:id", authMiddleware, visitorController.exitVisitor);
-router.post("/search-by-name", authMiddleware, visitorController.searchVisitorByName);
+// Visitor Management Routes
+router.post('/scan', authMiddleware, visitorController.scanQRCode);
+router.post('/invite', authMiddleware, visitorController.inviteVisitor);
+router.post('/capture', upload.single('image'), visitorController.captureVisitor);
+router.post('/:id/resend-sms', authMiddleware, visitorController.resendVisitorSMS);
+router.get('/:id/approve', authMiddleware, visitorController.approveVisitor);
+router.get('/:id/deny', authMiddleware, visitorController.denyVisitor);
+router.get('/:id/exit', authMiddleware, visitorController.exitVisitor);
 
-// Admin/Reporting routes
-router.get("/logs", authMiddleware, visitorController.getAllVisitorLogs);
-router.get("/entry-logs", authMiddleware, visitorController.getAllEntryLogs);
-router.get("/pending-approvals", authMiddleware, visitorController.getPendingApprovals);
+// Visitor Data Routes
+router.get('/', authMiddleware, visitorController.getAllVisitorLogs);
+router.get('/search', authMiddleware, visitorController.searchVisitorByName);
+router.get('/pending', authMiddleware, visitorController.getPendingApprovals);
+router.get('/my-visitors', authMiddleware, visitorController.getMyVisitors);
+router.put('/:id', authMiddleware, visitorController.updateVisitor);
 
-// Public routes
-router.get("/qr/:qr_data", visitorController.getQRCode);
+// Log Routes
+router.get('/resident/logs', authMiddleware, visitorController.getResidentVisitorLogs);
+router.get('/security/logs', authMiddleware, visitorController.getSecurityVisitorLogs);
+router.get('/admin/logs', authMiddleware, visitorController.getAdminVisitorLogs);
+router.get('/:visitorId/logs', authMiddleware, visitorController.getVisitorLogs);
 
 module.exports = router;

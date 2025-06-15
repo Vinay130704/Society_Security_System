@@ -1,330 +1,744 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { toast } from 'react-toastify';
-import { 
-  QrCode, UserPlus, Users, Clock, Check, X, Share2, 
-  MessageSquare, Smartphone, Calendar, Search, Home, 
-  User, ArrowRightCircle, ArrowLeftCircle, Download 
-} from 'lucide-react';
-import html2canvas from 'html2canvas';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import { toast } from "react-toastify";
+import {
+  QrCode,
+  UserPlus,
+  Users,
+  MessageSquare,
+  Smartphone,
+  Calendar,
+  Search,
+  Home,
+  User,
+  ArrowRightCircle,
+  ArrowLeftCircle,
+  Download,
+  Edit,
+  Save,
+  X,
+  Clock,
+  CheckCircle,
+  XCircle,
+  RefreshCw,
+  Mail,
+  Share2
+} from "lucide-react";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+import QRCode from "qrcode";
 
 const ResidentVisitorManagement = () => {
-  const [activeTab, setActiveTab] = useState('invite');
+  const [activeTab, setActiveTab] = useState("invite");
   const [visitors, setVisitors] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [selectedDate, setSelectedDate] = useState(null);
   const [qrData, setQrData] = useState(null);
-  const [showShareOptions, setShowShareOptions] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSending, setIsSending] = useState(false);
   const [residentData, setResidentData] = useState(null);
-  const [residentLoading, setResidentLoading] = useState(true);
+  const [errors, setErrors] = useState({});
+  const [editingVisitor, setEditingVisitor] = useState(null);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    phone: "",
+    purpose: "Guest"
+  });
   const navigate = useNavigate();
 
   const [visitorForm, setVisitorForm] = useState({
-    name: '',
-    phone: '',
-    purpose: 'Guest'
+    name: "",
+    phone: "",
+    purpose: "Guest",
+    expectedArrival: new Date()
   });
 
-  const API_BASE_URL = 'http://localhost:5000/api';
+  const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
   const getAuthHeaders = () => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem("token");
     if (!token) {
-      navigate('/login');
-      return {};
+      toast.error("Please login to continue", { autoClose: 3000 });
+      navigate("/login");
+      return null;
     }
     return {
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
     };
   };
 
-  const fetchResidentData = async () => {
-    try {
-      setResidentLoading(true);
-      const response = await axios.get(`${API_BASE_URL}/profile/get-profile`, getAuthHeaders());
-      console.log('Resident Data Response:', response.data);
-      const resident = response.data.user || response.data.data || response.data;
-      if (!resident._id || !resident.flat_no) {
-        throw new Error('Resident data missing _id or flat_no');
-      }
-      setResidentData(resident);
-    } catch (error) {
-      console.error('Error fetching resident data:', error);
-      toast.error(error.message || 'Failed to load resident information');
-      navigate('/login');
-    } finally {
-      setResidentLoading(false);
-    }
-  };
+  // Fetch resident data and visitors
+  useEffect(() => {
+    const fetchData = async () => {
+      const headers = getAuthHeaders();
+      if (!headers) return;
 
-  const fetchVisitorLogs = async () => {
-    if (!residentData) return;
-    try {
-      setLoading(true);
-      const response = await axios.get(`${API_BASE_URL}/visitor/logs`, getAuthHeaders());
-      console.log('Visitor Logs Response:', response.data);
-      const residentVisitors = response.data.data.filter(
-        visitor => visitor.resident_id._id === residentData._id
-      );
-      setVisitors(residentVisitors);
-    } catch (error) {
-      console.error('Error fetching visitor logs:', error);
-      toast.error(error.response?.data?.message || 'Failed to load visitor logs');
-    } finally {
-      setLoading(false);
+      setIsLoading(true);
+      try {
+        // Fetch resident profile
+        const residentRes = await axios.get(`${API_BASE_URL}/profile/get-profile`, headers);
+        setResidentData(residentRes.data.data || residentRes.data.user || residentRes.data);
+
+        // Fetch visitor logs
+        const visitorsRes = await axios.get(`${API_BASE_URL}/visitor/my-visitors`, headers);
+        setVisitors(visitorsRes.data.visitors || visitorsRes.data || []);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        toast.error(error.response?.data?.message || "Failed to load data");
+        if (error.response?.status === 401) {
+          localStorage.removeItem("token");
+          navigate("/login");
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const validateForm = () => {
+    const newErrors = {};
+    if (!visitorForm.name.trim()) {
+      newErrors.name = "Name is required";
+    } else if (visitorForm.name.length < 2) {
+      newErrors.name = "Name must be at least 2 characters";
     }
+    if (!visitorForm.phone) {
+      newErrors.phone = "Phone number is required";
+    } else if (!/^[0-9]{10}$/.test(visitorForm.phone.replace(/\D/g, ""))) {
+      newErrors.phone = "Phone number must be 10 digits";
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleInviteVisitor = async (e) => {
     e.preventDefault();
-    if (!residentData || !residentData._id || !residentData.flat_no) {
-      toast.error('Resident data not fully loaded. Please try again.');
+
+    if (!validateForm()) {
+      toast.error("Please fix the form errors", { autoClose: 3000 });
       return;
     }
-    const payload = {
-      name: visitorForm.name,
-      phone: visitorForm.phone,
-      purpose: visitorForm.purpose,
-      resident_id: residentData._id,
-      flat_no: residentData.flat_no
-    };
-    console.log('Invite Payload:', payload);
+
+    const toastId = toast.loading("Inviting visitor...");
+    setIsSending(true);
     try {
-      const response = await axios.post(
-        `${API_BASE_URL}/visitor/invite`,
-        payload,
-        getAuthHeaders()
-      );
-      console.log('Invite Response:', response.data);
-      setQrData(response.data.data); // Set qrData with visitor and qr_code_url
-      toast.success('Visitor invited successfully!');
-      setVisitorForm({ 
-        name: '', 
-        phone: '', 
-        purpose: 'Guest'
+      const headers = getAuthHeaders();
+      if (!headers) return;
+
+      const payload = {
+        name: visitorForm.name.trim(),
+        phone: visitorForm.phone.replace(/\D/g, ""),
+        purpose: visitorForm.purpose,
+        flat_no: residentData.flat_no,
+        expected_arrival: visitorForm.expectedArrival,
+        is_pre_registered: true
+      };
+
+      const response = await axios.post(`${API_BASE_URL}/visitor/invite`, payload, headers);
+      const inviteData = response.data.data;
+
+      setQrData(inviteData);
+      setVisitorForm({
+        name: "",
+        phone: "",
+        purpose: "Guest",
+        expectedArrival: new Date()
       });
-      fetchVisitorLogs();
-    } catch (error) {
-      console.error('Error inviting visitor:', error);
-      console.log('Error Response:', error.response?.data);
-      toast.error(error.response?.data?.message || 'Failed to invite visitor');
-    }
-  };
+      
+      // Refresh visitor list
+      const visitorsRes = await axios.get(`${API_BASE_URL}/visitor/my-visitors`, headers);
+      setVisitors(visitorsRes.data.visitors || []);
 
-  const shareQRCode = async (method) => {
-    if (!qrData) return;
-    const visitorName = qrData.visitor.name;
-    const shareText = `Visitor Pass for ${visitorName}\nScan this QR code for entry:`;
-    const qrUrl = qrData.qr_code_url; // Use the backend-provided URL
-    
-    try {
-      const qrElement = document.getElementById('qr-code-container');
-      const canvas = await html2canvas(qrElement);
-      if (method === 'sms') {
-        window.open(`sms:${qrData.visitor.phone}?body=${encodeURIComponent(`${shareText}\n${qrUrl}`)}`);
-      } else if (method === 'whatsapp') {
-        window.open(`https://wa.me/${qrData.visitor.phone}?text=${encodeURIComponent(`${shareText}\n${qrUrl}`)}`);
-      }
+      toast.update(toastId, {
+        render: "Visitor invited and SMS sent successfully!",
+        type: "success",
+        isLoading: false,
+        autoClose: 3000,
+      });
     } catch (error) {
-      console.error('Error sharing QR code:', error);
-      toast.error('Failed to share visitor pass');
+      console.error("Error inviting visitor:", error);
+      toast.update(toastId, {
+        render: error.response?.data?.message || "Failed to invite visitor",
+        type: "error",
+        isLoading: false,
+        autoClose: 3000,
+      });
     } finally {
-      setShowShareOptions(false);
+      setIsSending(false);
     }
   };
 
-  const downloadQRCode = async () => {
+  const resendVisitorSMS = async (visitorId) => {
+    if (!visitorId) {
+      toast.error("Invalid visitor ID");
+      return;
+    }
+
+    const toastId = toast.loading("Resending SMS...");
+    setIsSending(true);
     try {
-      const qrElement = document.getElementById('qr-code-container');
-      const canvas = await html2canvas(qrElement);
-      const link = document.createElement('a');
-      link.download = `visitor-pass-${qrData.visitor.name}.png`;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
+      const headers = getAuthHeaders();
+      if (!headers) return;
+
+      await axios.post(`${API_BASE_URL}/visitor/resend-sms/${visitorId}`, {}, headers);
+      
+      toast.update(toastId, {
+        render: "SMS resent successfully",
+        type: "success",
+        isLoading: false,
+        autoClose: 3000,
+      });
     } catch (error) {
-      console.error('Error downloading QR code:', error);
-      toast.error('Failed to download QR code');
+      console.error("Error resending SMS:", error);
+      toast.update(toastId, {
+        render: error.response?.data?.message || "Failed to resend SMS",
+        type: "error",
+        isLoading: false,
+        autoClose: 3000,
+      });
+    } finally {
+      setIsSending(false);
     }
   };
 
-  const filteredVisitors = visitors.filter(visitor => {
-    const matchesSearch = visitor.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         visitor.phone.includes(searchTerm);
-    const matchesDate = !selectedDate || 
-                       new Date(visitor.createdAt).toDateString() === selectedDate.toDateString();
+ const downloadQRCode = async (visitorId) => {
+  const toastId = toast.loading("Preparing QR code download...");
+  try {
+    const headers = getAuthHeaders();
+    if (!headers) return;
+
+    // First check if we already have the visitor data
+    const existingVisitor = visitors.find(v => v._id === visitorId);
+    
+    if (existingVisitor?.qr_code) {
+      // Use existing data if available
+      await generateAndDownloadQR(existingVisitor);
+    } else {
+      // Fallback to API request if needed
+      const visitorRes = await axios.get(`${API_BASE_URL}/visitor/${visitorId}`, headers);
+      const visitor = visitorRes.data.data || visitorRes.data;
+      await generateAndDownloadQR(visitor);
+    }
+    
+    toast.update(toastId, {
+      render: "QR code downloaded successfully",
+      type: "success",
+      isLoading: false,
+      autoClose: 3000,
+    });
+  } catch (error) {
+    console.error("Error downloading QR code:", error);
+    toast.update(toastId, {
+      render: error.response?.data?.message || error.message || "Failed to download QR code",
+      type: "error",
+      isLoading: false,
+      autoClose: 3000,
+    });
+  }
+};
+
+const generateAndDownloadQR = async (visitor) => {
+  if (!visitor?.qr_code) {
+    throw new Error("No QR code available for this visitor");
+  }
+
+  const canvas = document.createElement("canvas");
+  await QRCode.toCanvas(canvas, visitor.qr_code, {
+    width: 400,
+    margin: 2,
+    color: {
+      dark: '#000000',
+      light: '#FFFFFF'
+    }
+  });
+
+  const link = document.createElement('a');
+  link.download = `visitor-pass-${visitor.name || visitor._id}.png`;
+  link.href = canvas.toDataURL('image/png');
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+  const approveVisitor = async (visitorId) => {
+    const toastId = toast.loading("Approving visitor...");
+    try {
+      const headers = getAuthHeaders();
+      if (!headers) return;
+
+      await axios.get(`${API_BASE_URL}/visitor/approve/${visitorId}`, headers);
+      
+      // Refresh visitor list
+      const visitorsRes = await axios.get(`${API_BASE_URL}/visitor/my-visitors`, headers);
+      setVisitors(visitorsRes.data.visitors || []);
+
+      toast.update(toastId, {
+        render: "Visitor approved successfully",
+        type: "success",
+        isLoading: false,
+        autoClose: 3000,
+      });
+    } catch (error) {
+      console.error("Error approving visitor:", error);
+      toast.update(toastId, {
+        render: error.response?.data?.message || "Failed to approve visitor",
+        type: "error",
+        isLoading: false,
+        autoClose: 3000,
+      });
+    }
+  };
+
+  const denyVisitor = async (visitorId) => {
+    const toastId = toast.loading("Denying visitor...");
+    try {
+      const headers = getAuthHeaders();
+      if (!headers) return;
+
+      await axios.get(`${API_BASE_URL}/visitor/deny/${visitorId}`, headers);
+      
+      // Refresh visitor list
+      const visitorsRes = await axios.get(`${API_BASE_URL}/visitor/my-visitors`, headers);
+      setVisitors(visitorsRes.data.visitors || []);
+
+      toast.update(toastId, {
+        render: "Visitor denied successfully",
+        type: "success",
+        isLoading: false,
+        autoClose: 3000,
+      });
+    } catch (error) {
+      console.error("Error denying visitor:", error);
+      toast.update(toastId, {
+        render: error.response?.data?.message || "Failed to deny visitor",
+        type: "error",
+        isLoading: false,
+        autoClose: 3000,
+      });
+    }
+  };
+
+  const startEditing = (visitor) => {
+    setEditingVisitor(visitor._id);
+    setEditForm({
+      name: visitor.name,
+      phone: visitor.phone,
+      purpose: visitor.purpose || "Guest"
+    });
+  };
+
+  const cancelEditing = () => {
+    setEditingVisitor(null);
+    setEditForm({ name: "", phone: "", purpose: "Guest" });
+  };
+
+  const updateVisitor = async () => {
+    if (!editingVisitor) return;
+
+    const toastId = toast.loading("Updating visitor...");
+    try {
+      const headers = getAuthHeaders();
+      if (!headers) return;
+
+      const response = await axios.put(
+        `${API_BASE_URL}/visitor/update/${editingVisitor}`,
+        editForm,
+        headers
+      );
+
+      // Update local visitors list
+      setVisitors(visitors.map(v => 
+        v._id === editingVisitor ? { ...v, ...response.data.data } : v
+      ));
+
+      setEditingVisitor(null);
+      
+      toast.update(toastId, {
+        render: "Visitor updated successfully",
+        type: "success",
+        isLoading: false,
+        autoClose: 3000,
+      });
+    } catch (error) {
+      console.error("Error updating visitor:", error);
+      toast.update(toastId, {
+        render: error.response?.data?.message || "Failed to update visitor",
+        type: "error",
+        isLoading: false,
+        autoClose: 3000,
+      });
+    }
+  };
+
+  const filteredVisitors = visitors.filter((visitor) => {
+    if (!visitor) return false;
+
+    const matchesSearch =
+      visitor.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      visitor.phone?.includes(searchTerm);
+
+    const matchesDate =
+      !selectedDate ||
+      (visitor.createdAt &&
+        new Date(visitor.createdAt).toDateString() === selectedDate.toDateString());
+
     return matchesSearch && matchesDate;
   });
 
-  useEffect(() => {
-    fetchResidentData();
-  }, []);
-
-  useEffect(() => {
-    if (residentData) fetchVisitorLogs();
-  }, [residentData]);
-
-  if (residentLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-blue-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    );
+const formatTime = (timeString) => {
+  if (!timeString) return "-";
+  try {
+    const date = new Date(timeString);
+    // Check if the date is valid
+    if (isNaN(date.getTime())) return "-";
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  } catch (error) {
+    return "-";
   }
+};
+
+  const formatDate = (dateString) => {
+    if (!dateString) return "-";
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch (error) {
+      return "-";
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case "checked_in":
+      case "granted":
+        return "bg-green-100 text-green-800";
+      case "pending":
+        return "bg-yellow-100 text-yellow-800";
+      case "checked_out":
+        return "bg-blue-100 text-blue-800";
+      case "rejected":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  const getStatusText = (status) => {
+    switch (status?.toLowerCase()) {
+      case "checked_in":
+        return "Checked In";
+      case "granted":
+        return "Approved";
+      case "pending":
+        return "Pending Approval";
+      case "checked_out":
+        return "Checked Out";
+      case "rejected":
+        return "Rejected";
+      default:
+        return status || "Unknown";
+    }
+  };
+
+  const refreshVisitorList = async () => {
+    const headers = getAuthHeaders();
+    if (!headers) return;
+
+    setIsLoading(true);
+    try {
+      const visitorsRes = await axios.get(`${API_BASE_URL}/visitor/my-visitors`, headers);
+      setVisitors(visitorsRes.data.visitors || []);
+      toast.success("Visitor list refreshed");
+    } catch (error) {
+      console.error("Error refreshing visitors:", error);
+      toast.error(error.response?.data?.message || "Failed to refresh visitors");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const shareVisitorPass = async (visitorId) => {
+    const toastId = toast.loading("Preparing visitor pass...");
+    try {
+      const headers = getAuthHeaders();
+      if (!headers) return;
+
+      // First get the visitor data
+      const visitorRes = await axios.get(`${API_BASE_URL}/visitor/${visitorId}`, headers);
+      const visitor = visitorRes.data.data || visitorRes.data;
+
+      if (!visitor.qr_code) {
+        throw new Error("No QR code available for this visitor");
+      }
+
+      // Generate QR code data URL
+      const qrDataUrl = await QRCode.toDataURL(visitor.qr_code, {
+        width: 400,
+        margin: 2
+      });
+
+      // Create share text
+      const shareText = `Visitor Pass for ${visitor.name}\n\n` +
+        `Flat: ${visitor.flat_no}\n` +
+        `Purpose: ${visitor.purpose || "Not specified"}\n` +
+        `Status: ${getStatusText(visitor.entry_status)}\n\n` +
+        `Scan the QR code for entry`;
+
+      if (navigator.share) {
+        // Use Web Share API if available
+        await navigator.share({
+          title: `Visitor Pass - ${visitor.name}`,
+          text: shareText,
+          files: [await (await fetch(qrDataUrl)).blob()]
+        });
+      } else {
+        // Fallback to email
+        const mailtoLink = `mailto:?subject=Visitor Pass - ${visitor.name}&body=${encodeURIComponent(shareText)}`;
+        window.open(mailtoLink);
+      }
+      
+      toast.update(toastId, {
+        render: "Visitor pass shared successfully",
+        type: "success",
+        isLoading: false,
+        autoClose: 3000,
+      });
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        console.error("Error sharing visitor pass:", error);
+        toast.update(toastId, {
+          render: error.response?.data?.message || error.message || "Failed to share visitor pass",
+          type: "error",
+          isLoading: false,
+          autoClose: 3000,
+        });
+      }
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-4 md:p-8">
+    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
+        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-800">My Visitor Management</h1>
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Visitor Management</h1>
               <p className="text-gray-600 mt-1">
-                {residentData ? `Resident: ${residentData.name}` : 'No resident information available'}
+                {residentData ? (
+                  <>
+                    Resident: {residentData.name} • Flat {residentData.flat_no}
+                  </>
+                ) : (
+                  "Loading resident information..."
+                )}
               </p>
             </div>
-            <button 
-              onClick={() => navigate('/dashboard')}
-              className="mt-4 md:mt-0 flex items-center gap-2 bg-blue-100 hover:bg-blue-200 text-blue-800 px-4 py-2 rounded-lg transition"
-            >
-              <Home size={18} /> Back to Dashboard
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={refreshVisitorList}
+                disabled={isLoading}
+                className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg transition disabled:opacity-50"
+              >
+                <RefreshCw size={18} className={isLoading ? "animate-spin" : ""} />
+                Refresh
+              </button>
+              <button
+                onClick={() => navigate("/dashboard")}
+                className="flex items-center gap-2 bg-blue-100 hover:bg-blue-200 text-blue-800 px-4 py-2 rounded-lg transition"
+              >
+                <Home size={18} /> Dashboard
+              </button>
+            </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-lg overflow-hidden mb-6">
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-6">
           <div className="flex border-b border-gray-200">
             <button
-              onClick={() => setActiveTab('invite')}
-              className={`flex-1 py-4 px-6 text-center font-medium flex items-center justify-center gap-2 ${activeTab === 'invite' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+              onClick={() => setActiveTab("invite")}
+              className={`flex-1 py-4 px-6 text-center font-medium flex items-center justify-center gap-2 ${
+                activeTab === "invite"
+                  ? "text-blue-600 border-b-2 border-blue-600"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
             >
               <UserPlus size={18} /> Invite Visitor
             </button>
             <button
-              onClick={() => setActiveTab('logs')}
-              className={`flex-1 py-4 px-6 text-center font-medium flex items-center justify-center gap-2 ${activeTab === 'logs' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+              onClick={() => setActiveTab("logs")}
+              className={`flex-1 py-4 px-6 text-center font-medium flex items-center justify-center gap-2 ${
+                activeTab === "logs"
+                  ? "text-blue-600 border-b-2 border-blue-600"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
             >
-              <Users size={18} /> My Visitor Logs
+              <Users size={18} /> My Visitors ({visitors.length})
             </button>
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-lg overflow-hidden p-6">
-          {activeTab === 'invite' && (
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden p-6">
+          {activeTab === "invite" && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               <div>
                 <h2 className="text-xl font-bold text-gray-800 mb-4">Invite New Visitor</h2>
                 <form onSubmit={handleInviteVisitor} className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Visitor Name *</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Visitor Name *
+                    </label>
                     <input
                       type="text"
                       value={visitorForm.name}
-                      onChange={(e) => setVisitorForm({...visitorForm, name: e.target.value})}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                      required
+                      onChange={(e) => setVisitorForm({ ...visitorForm, name: e.target.value })}
+                      className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
+                        errors.name ? "border-red-500" : "border-gray-300"
+                      }`}
                       placeholder="Enter visitor's full name"
                     />
+                    {errors.name && (
+                      <p className="text-red-500 text-xs mt-1">{errors.name}</p>
+                    )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Phone Number *
+                    </label>
                     <input
                       type="tel"
                       value={visitorForm.phone}
-                      onChange={(e) => setVisitorForm({...visitorForm, phone: e.target.value})}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                      required
-                      placeholder="Enter visitor's phone number"
-                      pattern="[0-9]{10}"
+                      onChange={(e) => setVisitorForm({ ...visitorForm, phone: e.target.value })}
+                      className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
+                        errors.phone ? "border-red-500" : "border-gray-300"
+                      }`}
+                      placeholder="Enter 10-digit phone number"
                     />
+                    {errors.phone && (
+                      <p className="text-red-500 text-xs mt-1">{errors.phone}</p>
+                    )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Purpose of Visit</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Purpose of Visit
+                    </label>
                     <select
                       value={visitorForm.purpose}
-                      onChange={(e) => setVisitorForm({...visitorForm, purpose: e.target.value})}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                      onChange={(e) => setVisitorForm({ ...visitorForm, purpose: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                     >
                       <option value="Guest">Guest</option>
+                      <option value="Delivery">Delivery</option>
+                      <option value="Service">Service</option>
+                      <option value="Maintenance">Maintenance</option>
+                      <option value="Business">Business</option>
                       <option value="Other">Other</option>
                     </select>
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Expected Arrival Time
+                    </label>
+                    <div className="flex items-center gap-2 bg-white px-4 py-2 border border-gray-300 rounded-lg">
+                      <Calendar className="text-gray-400" size={18} />
+                      <DatePicker
+                        selected={visitorForm.expectedArrival}
+                        onChange={(date) => setVisitorForm({...visitorForm, expectedArrival: date})}
+                        showTimeSelect
+                        timeFormat="HH:mm"
+                        timeIntervals={15}
+                        dateFormat="MMMM d, yyyy h:mm aa"
+                        className="w-full focus:outline-none"
+                      />
+                    </div>
+                  </div>
                   <button
                     type="submit"
-                    disabled={!residentData}
-                    className={`w-full py-3 px-4 rounded-lg transition flex items-center justify-center gap-2 shadow-md ${
-                      residentData 
-                        ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white'
-                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    }`}
+                    disabled={isSending}
+                    className="w-full py-3 px-4 rounded-lg transition flex items-center justify-center gap-2 shadow-md bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white disabled:opacity-70 disabled:cursor-not-allowed"
                   >
-                    <QrCode size={18} /> Generate Visitor Pass
+                    {isSending ? (
+                      <span className="flex items-center gap-2">
+                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Processing...
+                      </span>
+                    ) : (
+                      <>
+                        <QrCode size={18} /> Generate Visitor Pass
+                      </>
+                    )}
                   </button>
                 </form>
               </div>
 
               <div className="flex flex-col items-center justify-center">
                 {qrData ? (
-                  <div className="text-center">
-                    <div id="qr-code-container" className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-                      <div className="flex justify-center mb-2">
-                        <img 
-                          src={qrData.qr_code_url} // Use the backend-provided QR code URL
-                          alt="Visitor QR Code"
-                          style={{ width: 220, height: 220 }}
+                  <div className="text-center w-full">
+                    <div className="bg-white p-6 rounded-xl shadow-md border border-gray-200 max-w-md mx-auto">
+                      <div className="flex justify-center mb-4">
+                        <QRCode 
+                          value={qrData.qr_code || qrData.qr_code_data || ""} 
+                          size={224}
+                          level="H"
+                          includeMargin={true}
                         />
                       </div>
                       <div className="mt-4 space-y-1">
-                        <p className="text-lg font-semibold text-gray-800">{qrData.visitor.name}</p>
-                        <p className="text-gray-600 flex items-center justify-center gap-2">
-                          <Smartphone size={16} /> {qrData.visitor.phone}
+                        <p className="text-lg font-semibold text-gray-800">
+                          {qrData.visitor?.name || qrData.name || "Unknown"}
                         </p>
-                        <p className="text-sm text-gray-500">Purpose: {qrData.visitor.purpose}</p>
+                        <p className="text-gray-600 flex items-center justify-center gap-2">
+                          <Smartphone size={16} /> {qrData.visitor?.phone || qrData.phone || "-"}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          Purpose: {qrData.visitor?.purpose || qrData.purpose || "Not specified"}
+                        </p>
+                        {qrData.visitor?.expected_arrival && (
+                          <p className="text-sm text-gray-500 flex items-center justify-center gap-1">
+                            <Clock size={14} />
+                            Expected: {formatDate(qrData.visitor.expected_arrival)}
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="mt-6 flex flex-wrap gap-3 justify-center">
                       <button
-                        onClick={() => setShowShareOptions(!showShareOptions)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition flex items-center justify-center gap-2 shadow"
+                        onClick={() => resendVisitorSMS(qrData.visitor?._id || qrData._id)}
+                        disabled={isSending}
+                        className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg transition flex items-center justify-center gap-2 shadow disabled:opacity-70"
                       >
-                        <Share2 size={16} /> Share Pass
+                        <MessageSquare size={16} /> Resend SMS
                       </button>
                       <button
-                        onClick={downloadQRCode}
+                        onClick={() => downloadQRCode(qrData.visitor?._id || qrData._id)}
                         className="bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg transition flex items-center justify-center gap-2 shadow"
                       >
-                        <Download size={16} /> Download
+                        <Download size={16} /> Download QR
                       </button>
-                      {showShareOptions && (
-                        <div className="absolute mt-12 bg-white shadow-xl rounded-lg p-3 z-10 flex gap-3 border border-gray-200">
-                          <button
-                            onClick={() => shareQRCode('sms')}
-                            className="p-3 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition flex flex-col items-center gap-1"
-                            title="Share via SMS"
-                          >
-                            <MessageSquare size={20} />
-                            <span className="text-xs">SMS</span>
-                          </button>
-                          <button
-                            onClick={() => shareQRCode('whatsapp')}
-                            className="p-3 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition flex flex-col items-center gap-1"
-                            title="Share via WhatsApp"
-                          >
-                            <Smartphone size={20} />
-                            <span className="text-xs">WhatsApp</span>
-                          </button>
-                        </div>
-                      )}
+                      <button
+                        onClick={() => shareVisitorPass(qrData.visitor?._id || qrData._id)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition flex items-center justify-center gap-2 shadow"
+                      >
+                        <Share2 size={16} /> Share
+                      </button>
                     </div>
                   </div>
                 ) : (
-                  <div className="text-center text-gray-500 p-8 border-2 border-dashed border-gray-300 rounded-xl">
+                  <div className="text-center text-gray-500 p-8 border-2 border-dashed border-gray-300 rounded-xl w-full max-w-md mx-auto">
                     <QrCode size={64} className="mx-auto text-gray-300 mb-4" />
                     <h3 className="text-lg font-medium text-gray-600">Visitor QR Pass</h3>
                     <p className="mt-2">Fill the form to generate a visitor pass QR code</p>
@@ -334,19 +748,22 @@ const ResidentVisitorManagement = () => {
             </div>
           )}
 
-          {activeTab === 'logs' && (
+          {activeTab === "logs" && (
             <div>
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                 <h2 className="text-xl font-bold text-gray-800">My Visitor History</h2>
                 <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                   <div className="relative flex-1 min-w-[200px]">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                    <Search
+                      className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                      size={18}
+                    />
                     <input
                       type="text"
-                      placeholder="Search visitors..."
+                      placeholder="Search by name or phone..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                     />
                   </div>
                   <div className="flex items-center gap-2 bg-white px-3 py-2 border border-gray-300 rounded-lg">
@@ -363,97 +780,187 @@ const ResidentVisitorManagement = () => {
                 </div>
               </div>
 
-              {loading ? (
-                <div className="flex justify-center items-center h-64">
+              {isLoading ? (
+                <div className="flex justify-center items-center py-12">
                   <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
                 </div>
               ) : filteredVisitors.length === 0 ? (
                 <div className="text-center py-12 text-gray-500">
                   <Users size={48} className="mx-auto text-gray-300 mb-4" />
-                  <p>No visitor records found</p>
-                  {searchTerm || selectedDate ? (
-                    <button 
-                      onClick={() => {
-                        setSearchTerm('');
-                        setSelectedDate(null);
-                      }}
-                      className="mt-4 text-blue-600 hover:text-blue-800"
-                    >
-                      Clear filters
-                    </button>
-                  ) : null}
+                  <p>
+                    {searchTerm || selectedDate
+                      ? "No visitors found matching your criteria"
+                      : "No visitor records found"}
+                  </p>
                 </div>
               ) : (
-                <div className="overflow-x-auto rounded-lg border border-gray-200 shadow">
+                <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Visitor Details</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Visit Information</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timings</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Visitor Details
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Visit Information
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Timings
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Actions
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {filteredVisitors.map((visitor) => (
                         <tr key={visitor._id} className="hover:bg-gray-50 transition">
                           <td className="px-6 py-4">
-                            <div className="flex items-center">
-                              <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
-                                <User className="text-blue-600" size={18} />
-                              </div>
-                              <div className="ml-4">
-                                <div className="text-sm font-medium text-gray-900">{visitor.name}</div>
-                                <div className="text-sm text-gray-500">{visitor.phone}</div>
-                                <div className="text-xs text-gray-400 mt-1">
-                                  {new Date(visitor.createdAt).toLocaleDateString('en-US', {
-                                    year: 'numeric',
-                                    month: 'short',
-                                    day: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                  })}
+                            {editingVisitor === visitor._id ? (
+                              <input
+                                type="text"
+                                value={editForm.name}
+                                onChange={(e) => setEditForm({...editForm, name: e.target.value})}
+                                className="w-full p-2 border rounded"
+                              />
+                            ) : (
+                              <div className="flex items-center">
+                                <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                  <User className="text-blue-600" size={18} />
+                                </div>
+                                <div className="ml-4">
+                                  <div className="text-sm font-medium text-gray-900">{visitor.name || "Unknown"}</div>
+                                  <div className="text-sm text-gray-500">{visitor.phone || "-"}</div>
                                 </div>
                               </div>
-                            </div>
+                            )}
                           </td>
                           <td className="px-6 py-4">
-                            <div className="text-sm text-gray-900 font-medium">{visitor.purpose}</div>
-                            <span className="inline-block mt-1 px-2 py-0.5 text-xs font-medium rounded bg-blue-100 text-blue-800">
-                              Pre-registered
-                            </span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                              visitor.entry_status === 'Checked In' || visitor.entry_status === 'granted' ? 'bg-green-100 text-green-800' :
-                              visitor.entry_status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                              visitor.entry_status === 'exit' ? 'bg-blue-100 text-blue-800' :
-                              'bg-red-100 text-red-800'
-                            }`}>
-                              {visitor.entry_status === 'Checked In' ? 'Checked In' :
-                               visitor.entry_status === 'granted' ? 'Approved' :
-                               visitor.entry_status === 'pending' ? 'Pending' :
-                               visitor.entry_status === 'exit' ? 'Checked Out' : 
-                               visitor.entry_status === 'denied' ? 'Denied' : 'Unknown'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
-                              {visitor.entry_time ? (
-                                <>
-                                  <div className="flex items-center gap-1">
-                                    <ArrowRightCircle size={14} className="text-green-500" />
-                                    {new Date(visitor.entry_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                                  </div>
-                                  {visitor.exit_time && (
-                                    <div className="flex items-center gap-1 mt-1">
-                                      <ArrowLeftCircle size={14} className="text-blue-500" />
-                                      {new Date(visitor.exit_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                                    </div>
+                            {editingVisitor === visitor._id ? (
+                              <select
+                                value={editForm.purpose}
+                                onChange={(e) => setEditForm({...editForm, purpose: e.target.value})}
+                                className="w-full p-2 border rounded"
+                              >
+                                <option value="Guest">Guest</option>
+                                <option value="Delivery">Delivery</option>
+                                <option value="Service">Service</option>
+                                <option value="Maintenance">Maintenance</option>
+                                <option value="Business">Business</option>
+                                <option value="Other">Other</option>
+                              </select>
+                            ) : (
+                              <>
+                                <div className="text-sm text-gray-900 font-medium">{visitor.purpose || "Not specified"}</div>
+                                <div className="mt-1 flex gap-1">
+                                  <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded ${
+                                    visitor.is_pre_registered ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-800"
+                                  }`}>
+                                    {visitor.is_pre_registered ? "Pre-registered" : "Walk-in"}
+                                  </span>
+                                  {visitor.expected_arrival && (
+                                    <span className="inline-block px-2 py-0.5 text-xs font-medium rounded bg-purple-100 text-purple-800 flex items-center gap-1">
+                                      <Clock size={12} /> {formatTime(visitor.expected_arrival)}
+                                    </span>
                                   )}
-                                </>
-                              ) : '-'}
-                            </div>
+                                </div>
+                              </>
+                            )}
+                          </td>
+                          <td className="px-6 py-4">
+                            <span
+                              className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(
+                                visitor.entry_status
+                              )}`}
+                            >
+                              {getStatusText(visitor.entry_status)}
+                            </span>
+                          </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+  <div className="text-sm text-gray-900">
+    {visitor.last_entry_time ? (
+      <>
+        <div className="flex items-center gap-1">
+          <ArrowRightCircle size={14} className="text-green-500" />
+          {formatTime(visitor.last_entry_time)}
+        </div>
+        {visitor.last_exit_time && (
+          <div className="flex items-center gap-1 mt-1">
+            <ArrowLeftCircle size={14} className="text-blue-500" />
+            {formatTime(visitor.last_exit_time)}
+          </div>
+        )}
+      </>
+    ) : (
+      <div className="text-gray-400">No entry recorded</div>
+    )}
+  </div>
+</td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {editingVisitor === visitor._id ? (
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={updateVisitor}
+                                  className="text-green-600 hover:text-green-800 flex items-center gap-1 text-sm"
+                                >
+                                  <Save size={16} /> Save
+                                </button>
+                                <button
+                                  onClick={cancelEditing}
+                                  className="text-red-600 hover:text-red-800 flex items-center gap-1 text-sm"
+                                >
+                                  <X size={16} /> Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col gap-2">
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => startEditing(visitor)}
+                                    className="text-blue-600 hover:text-blue-800 flex items-center gap-1 text-sm"
+                                  >
+                                    <Edit size={16} /> Edit
+                                  </button>
+                                  {visitor.qr_code && (
+                                    <button
+                                      onClick={() => downloadQRCode(visitor._id)}
+                                      className="text-purple-600 hover:text-purple-800 flex items-center gap-1 text-sm"
+                                    >
+                                      <Download size={16} /> QR
+                                    </button>
+                                  )}
+                                </div>
+                                {visitor.is_pre_registered && (
+                                  <button
+                                    onClick={() => resendVisitorSMS(visitor._id)}
+                                    className="text-green-600 hover:text-green-800 flex items-center gap-1 text-sm"
+                                    disabled={isSending}
+                                  >
+                                    <MessageSquare size={16} /> Resend SMS
+                                  </button>
+                                )}
+                                {visitor.entry_status === "pending" && (
+                                  <div className="flex gap-2 mt-1">
+                                    <button
+                                      onClick={() => approveVisitor(visitor._id)}
+                                      className="text-green-600 hover:text-green-800 flex items-center gap-1 text-sm"
+                                    >
+                                      <CheckCircle size={16} /> Approve
+                                    </button>
+                                    <button
+                                      onClick={() => denyVisitor(visitor._id)}
+                                      className="text-red-600 hover:text-red-800 flex items-center gap-1 text-sm"
+                                    >
+                                      <XCircle size={16} /> Deny
+                                    </button>
+                                  </div>
+                                )}
+                                
+                              </div>
+                            )}
                           </td>
                         </tr>
                       ))}

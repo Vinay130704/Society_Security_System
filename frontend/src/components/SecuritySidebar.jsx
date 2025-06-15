@@ -13,7 +13,8 @@ import {
   ChevronUp,
   ClipboardList,
   Car,
-  Truck
+  Truck,
+  UserCircle
 } from "lucide-react";
 
 const SecurityLayout = () => {
@@ -31,10 +32,10 @@ const SecurityLayout = () => {
 
   const navItems = [
     { name: "Dashboard", icon: ShieldCheck, path: "/security/security-dashboard" },
+    { name: "Profile", icon: UserCircle, path: "/security/profile" },
     { name: "Scan Visitor", icon: QrCode, path: "/security/scan-visitor" },
-    { name: "Manual Entry", icon: User, path: "/security/manual-entry" },
-    { name: "Verify Staff", icon: Badge, path: "/security/verify-staff" },
-    { name: "Verify Worker", icon: HardHat, path: "/security/verify-worker" },
+    { name: "Vehicle Record", icon: Car, path: "/security/vehicle-record" },
+    { name: "Verify Staff", icon: Badge, path: "/security/staff-worker" },
     { name: "Emergency Alerts", icon: AlertTriangle, path: "/security/emergency" }
   ];
 
@@ -103,7 +104,7 @@ const SecurityLayout = () => {
                     </li>
                     <li>
                       <a 
-                        href="/security/vehicle-logs" 
+                        href="/security/vehicle-record" 
                         className={`flex items-center p-2 rounded-lg transition-colors hover:bg-primary-light/20 ${activeItem === "Vehicle Logs" ? "bg-secondary/70 text-white" : "text-white/90"}`}
                         onClick={() => setActiveItem("Vehicle Logs")}
                       >
@@ -127,15 +128,15 @@ const SecurityLayout = () => {
             </ul>
             
             {/* Logout */}
-            {/* <div className="mt-auto pt-4">
+            <div className="mt-auto pt-4">
               <a 
-                href="/logout" 
+                href="/login" 
                 className={`flex items-center p-3 hover:bg-primary-light/20 rounded-lg transition-colors ${isOpen ? "gap-4" : "justify-center"}`}
               >
                 <LogOut size={20} className="shrink-0" />
                 {isOpen && <span>Logout</span>}
               </a>
-            </div> */}
+            </div>
           </div>
         </div>
 

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, NavLink } from "react-router-dom";
-import { Menu, X, User, LogOut, Shield, Settings, Bell } from "lucide-react";
+import { Menu, X, User, LogOut, Shield, Settings, Bell, Key } from "lucide-react";
 import { useAuth } from "../Context/AuthContext";
 
 const Navbar = () => {
@@ -50,11 +50,6 @@ const Navbar = () => {
 
           {isLoggedIn ? (
             <div className="flex items-center space-x-4 ml-4">
-              <button className="relative p-2 rounded-full hover:bg-primary-light/30 transition-colors">
-                <Bell className="h-5 w-5 text-secondary" />
-                <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-red-500"></span>
-              </button>
-
               <div className="relative" ref={dropdownRef}>
                 <button
                   onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
@@ -66,38 +61,27 @@ const Navbar = () => {
                     </div>
                     <span className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-primary-dark"></span>
                   </div>
-                  <span className="text-sm font-medium text-gray-200">{user?.name || "Admin"}</span>
+                  <span className="text-sm font-medium text-gray-200">{user?.name }</span>
                 </button>
 
                 {isProfileDropdownOpen && (
                   <div className="absolute right-0 mt-2 w-56 bg-primary-dark/95 backdrop-blur-sm rounded-lg shadow-xl py-1 z-50 border border-primary-light/50">
-                    <div className="px-4 py-3 border-b border-primary-light">
-                      <p className="text-sm text-gray-300">Account</p>
-                      <p className="text-sm font-medium text-white truncate">GuardianNet User</p>
-                    </div>
-                    <Link
-                      to="/profile"
-                      className="flex items-center px-4 py-3 text-sm text-gray-300 hover:bg-primary-light/50 transition-colors"
-                      onClick={() => setIsProfileDropdownOpen(false)}
-                    >
-                      <User className="h-4 w-4 mr-3" /> Your Profile
-                    </Link>
-                    <Link
-                      to="/settings"
-                      className="flex items-center px-4 py-3 text-sm text-gray-300 hover:bg-primary-light/50 transition-colors"
-                      onClick={() => setIsProfileDropdownOpen(false)}
-                    >
-                      <Settings className="h-4 w-4 mr-3" /> Account Settings
-                    </Link>
                     <button
                       onClick={() => {
                         LogoutUser();
                         setIsProfileDropdownOpen(false);
                       }}
-                      className="w-full text-left flex items-center px-4 py-3 text-sm text-red-300 hover:bg-primary-light/50 hover:text-red-200 transition-colors border-t border-primary-light/50"
+                      className="w-full text-left flex items-center px-4 py-3 text-sm text-red-300 hover:bg-primary-light/50 hover:text-red-200 transition-colors"
                     >
-                      <LogOut className="h-4 w-4 mr-3" /> Sign out
+                      <LogOut className="h-4 w-4 mr-3" /> Logout
                     </button>
+                    <Link
+                      to="/reset-password"
+                      className="flex items-center px-4 py-3 text-sm text-gray-300 hover:bg-primary-light/50 transition-colors border-t border-primary-light/50"
+                      onClick={() => setIsProfileDropdownOpen(false)}
+                    >
+                      <Key className="h-4 w-4 mr-3" /> Forgot Password
+                    </Link>
                   </div>
                 )}
               </div>
@@ -153,26 +137,24 @@ const Navbar = () => {
             </NavLink>
 
             {isLoggedIn ? (
-              <>
-                <div className="border-t border-primary-light/50 pt-2 mt-2">
-                  <NavLink
-                    to="/profile"
-                    className="flex items-center px-3 py-2 rounded-md text-base font-medium text-gray-200 hover:text-white hover:bg-primary-light/30"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <User className="h-5 w-5 mr-3" /> Profile
-                  </NavLink>
-                  <button
-                    onClick={() => {
-                      LogoutUser();
-                      setIsMobileMenuOpen(false);
-                    }}
-                    className="w-full flex items-center px-3 py-2 rounded-md text-base font-medium text-red-300 hover:text-red-200 hover:bg-primary-light/30"
-                  >
-                    <LogOut className="h-5 w-5 mr-3" /> Sign Out
-                  </button>
-                </div>
-              </>
+              <div className="border-t border-primary-light/50 pt-4 mt-2 flex flex-col space-y-3">
+                <button
+                  onClick={() => {
+                    LogoutUser();
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="w-full text-center px-4 py-2 rounded-md text-base font-medium text-red-300 hover:text-red-200 hover:bg-primary-light/30"
+                >
+                  Logout
+                </button>
+                <NavLink
+                  to="/reset-password"
+                  className="w-full text-center px-4 py-2 rounded-md text-base font-medium text-gray-200 hover:text-white hover:bg-primary-light/30"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  Forgot Password
+                </NavLink>
+              </div>
             ) : (
               <div className="border-t border-primary-light/50 pt-4 mt-2 flex flex-col space-y-3">
                 <NavLink
@@ -183,7 +165,7 @@ const Navbar = () => {
                   Login
                 </NavLink>
                 <NavLink
-                  to="/resident-register"
+                  to="/register"
                   className="w-full text-center px-4 py-2 rounded-md text-base font-medium bg-secondary hover:bg-secondary-dark text-white"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >

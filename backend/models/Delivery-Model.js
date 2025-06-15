@@ -26,8 +26,9 @@ const DeliveryRequestSchema = new mongoose.Schema({
     type: Date,
     required: true
   },
-  qrCode: {
+  uniqueId: {
     type: String,
+    unique: true,
     default: null
   },
   status: {

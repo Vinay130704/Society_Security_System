@@ -25,14 +25,13 @@ const EmergencyAlertSchema = new mongoose.Schema({
     type: String,
   },
   photo: {
-    type: String, // URL to stored image
+    type: String,
   },
   status: {
     type: String,
     enum: ["Pending", "Processing", "Resolved"],
     default: "Pending",
   },
-  // New fields to track verification
   verifiedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
@@ -47,13 +46,12 @@ const EmergencyAlertSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
-}, { 
+}, {
   timestamps: true,
   toJSON: { virtuals: true },
   toObject: { virtuals: true }
 });
 
-// Virtual population
 EmergencyAlertSchema.virtual('verifier', {
   ref: 'User',
   localField: 'verifiedBy',

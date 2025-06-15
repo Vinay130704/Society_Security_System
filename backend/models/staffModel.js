@@ -14,6 +14,10 @@ const staffSchema = new mongoose.Schema({
         type: String,
         default: ""
     },
+    phone: {
+        type: String,
+        required: true,
+    },
     residentId: {
         type: mongoose.Schema.Types.ObjectId, 
         ref: "User", 
@@ -21,7 +25,7 @@ const staffSchema = new mongoose.Schema({
     },
     permanentId: { 
         type: String, 
-        unique: true ,
+        unique: true,
         required: true
     },
     status: {
@@ -44,7 +48,6 @@ const staffSchema = new mongoose.Schema({
         type: String, 
         default: "" 
     },
-
 });
 
 module.exports = mongoose.model("Staff", staffSchema);

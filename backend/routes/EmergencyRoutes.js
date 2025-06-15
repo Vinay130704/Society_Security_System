@@ -18,7 +18,7 @@ router.get("/my-alerts", authMiddleware, getResidentAlerts);
 router.post("/unauthorized-entry", authMiddleware, triggerUnauthorizedEntry);
 
 // Admin/Security endpoints
-router.get("/all-emergency-alerts", authMiddleware, getAllAlerts); // Changed from "/" to "/all"
+router.get("/all-emergency-alerts", authMiddleware, getAllAlerts);
 router.put("/:id/status", authMiddleware, updateAlertStatus);
 router.delete("/delete/:id", authMiddleware, deleteAlert);
 

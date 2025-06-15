@@ -1,6 +1,6 @@
+const mongoose = require("mongoose");
 const Event = require("../models/Event");
 const User = require("../models/User");
-const { getIO } = require("../socket");
 
 // Admin: Create Event
 exports.createEvent = async (req, res) => {
@@ -19,18 +19,12 @@ exports.createEvent = async (req, res) => {
 
     await event.save();
 
-    // Notify all residents about new event
-    const io = getIO();
-    io.emit('newEvent', { 
-      message: `New event: ${title} on ${date}`,
-      event
-    });
-
     res.status(201).json({
       success: true,
       data: event
     });
   } catch (error) {
+    console.error('Error creating event:', error);
     res.status(500).json({
       success: false,
       message: "Error creating event",
@@ -55,7 +49,7 @@ exports.getAllEvents = async (req, res) => {
       page: parseInt(page),
       limit: parseInt(limit),
       sort: { date: 1 },
-      populate: 'organizer'
+      populate: { path: 'organizer', select: 'name email' }
     };
 
     const events = await Event.paginate(query, options);
@@ -73,6 +67,7 @@ exports.getAllEvents = async (req, res) => {
       }
     });
   } catch (error) {
+    console.error('Error fetching events:', error);
     res.status(500).json({
       success: false,
       message: "Error fetching events",
@@ -84,9 +79,14 @@ exports.getAllEvents = async (req, res) => {
 // Get Single Event
 exports.getEventById = async (req, res) => {
   try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid event ID"
+      });
+    }
     const event = await Event.findById(req.params.id)
-      .populate('organizer', 'name email')
-      .populate('attendees', 'name email');
+      .populate('organizer', 'name email');
 
     if (!event) {
       return res.status(404).json({
@@ -100,9 +100,16 @@ exports.getEventById = async (req, res) => {
       data: event
     });
   } catch (error) {
+    console.error('Error fetching event:', error);
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid event ID"
+      });
+    }
     res.status(500).json({
       success: false,
-      message: "Error fetching event",
+      message: "Error retrieving event",
       error: error.message
     });
   }
@@ -111,6 +118,12 @@ exports.getEventById = async (req, res) => {
 // Admin: Update Event
 exports.updateEvent = async (req, res) => {
   try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid event ID'
+      });
+    }
     const event = await Event.findByIdAndUpdate(
       req.params.id,
       req.body,
@@ -124,18 +137,18 @@ exports.updateEvent = async (req, res) => {
       });
     }
 
-    // Notify attendees about updates
-    const io = getIO();
-    io.emit('eventUpdated', {
-      message: `Event updated: ${event.title}`,
-      event
-    });
-
     res.json({
       success: true,
       data: event
     });
   } catch (error) {
+    console.error('Error updating event:', error);
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid event ID'
+      });
+    }
     res.status(500).json({
       success: false,
       message: "Error updating event",
@@ -147,6 +160,12 @@ exports.updateEvent = async (req, res) => {
 // Admin: Delete Event
 exports.deleteEvent = async (req, res) => {
   try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid event ID'
+      });
+    }
     const event = await Event.findByIdAndDelete(req.params.id);
 
     if (!event) {
@@ -156,71 +175,21 @@ exports.deleteEvent = async (req, res) => {
       });
     }
 
-    // Notify attendees about cancellation
-    const io = getIO();
-    io.emit('eventCancelled', {
-      message: `Event cancelled: ${event.title}`,
-      eventId: req.params.id
-    });
-
     res.json({
       success: true,
       message: "Event deleted successfully"
     });
   } catch (error) {
+    console.error('Error deleting event:', error);
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid event ID'
+      });
+    }
     res.status(500).json({
       success: false,
       message: "Error deleting event",
-      error: error.message
-    });
-  }
-};
-
-// Resident: Register for Event
-exports.registerForEvent = async (req, res) => {
-  try {
-    const event = await Event.findById(req.params.id);
-
-    if (!event) {
-      return res.status(404).json({
-        success: false,
-        message: "Event not found"
-      });
-    }
-
-    if (event.isCancelled) {
-      return res.status(400).json({
-        success: false,
-        message: "Event is cancelled"
-      });
-    }
-
-    if (event.attendees.includes(req.user.userId)) {
-      return res.status(400).json({
-        success: false,
-        message: "Already registered for this event"
-      });
-    }
-
-    event.attendees.push(req.user.userId);
-    await event.save();
-
-    // Send confirmation to resident
-    const io = getIO();
-    io.to(`user_${req.user.userId}`).emit('eventRegistration', {
-      message: `You've successfully registered for ${event.title}`,
-      event
-    });
-
-    res.json({
-      success: true,
-      message: "Registered for event successfully",
-      data: event
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Error registering for event",
       error: error.message
     });
   }

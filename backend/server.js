@@ -16,9 +16,6 @@ const deleteUnapprovedUsers = require("./utils/deleteUnapprovedUsers");
 // Middleware
 const errorHandler = require("./middleware/errorHandler");
 
-// Socket.io setup
-const { initializeSocket } = require("./socket");
-
 // Route imports
 const staffRoutes = require("./routes/Staff-Routes");
 const authRoutes = require("./routes/Auth-Routes");
@@ -35,21 +32,23 @@ const profileRoutes = require("./routes/profileRoutes");
 const app = express();
 const server = http.createServer(app);
 
-// Initialize WebSocket
-initializeSocket(server);
+// Helper function to get server base URL
+const getServerBaseUrl = (req) => {
+  return `${req.protocol}://${req.get("host")}`;
+};
 
 // Middleware setup
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: "http://localhost:5173", // Frontend URL (update for production)
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true
+    credentials: true,
   })
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use("/uploads", express.static("uploads"));
+app.use("/uploads", express.static("Uploads"));
 
 // Connect to MongoDB
 connectDB();
@@ -66,11 +65,18 @@ app.use("/api/worker", workerRoutes);
 app.use("/api/event", eventRoutes);
 app.use("/api/profile", profileRoutes);
 
+// Sample route to test the base URL function
+app.get("/api/test-url", (req, res) => {
+  const baseUrl = getServerBaseUrl(req);
+  res.json({ success: true, baseUrl });
+});
+
 // Error handling middleware (must be last)
 app.use(errorHandler);
 
 // Scheduled tasks
 cron.schedule("0 * * * *", async () => {
+  console.log("Running scheduled task to delete unapproved users...");
   await deleteUnapprovedUsers();
 });
 
@@ -82,10 +88,12 @@ server.listen(PORT, () => {
 
 // Handle unhandled promise rejections
 process.on("unhandledRejection", (err) => {
+  console.error("Unhandled Rejection:", err);
   server.close(() => process.exit(1));
 });
 
 // Handle uncaught exceptions
 process.on("uncaughtException", (err) => {
+  console.error("Uncaught Exception:", err);
   server.close(() => process.exit(1));
 });
