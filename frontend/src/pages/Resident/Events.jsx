@@ -84,7 +84,7 @@ const EventsPage = () => {
         throw new Error('Invalid event ID');
       }
       const promise = axios.get(
-        `${API_BASE_URL}/view-eventby/${eventId}`,
+        `${API_BASE_URL}//view-event/${eventId}`,
         getAuthHeaders()
       );
 

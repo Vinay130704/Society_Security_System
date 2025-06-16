@@ -263,7 +263,7 @@ const VehicleAdminPanel = () => {
     };
 
     return (
-        <div className="p-4 md:p-10 min-h-screen bg-background">
+        <div className="p-6 mt-10 md:p-10 min-h-screen bg-background">
             <motion.div
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}

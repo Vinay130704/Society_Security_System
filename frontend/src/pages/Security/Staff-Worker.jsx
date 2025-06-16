@@ -14,12 +14,13 @@ import {
   Shield,
   History,
   UserCheck,
-  UserX
+  UserX,
+  PlusCircle
 } from 'lucide-react';
 
 // Configure axios defaults
 axios.defaults.withCredentials = true;
-const API_BASE_URL ='http://localhost:5000/api/staff';
+const API_BASE_URL = 'http://localhost:5000/api';
 
 const SecurityStaffManagement = () => {
   // State declarations
@@ -29,11 +30,19 @@ const SecurityStaffManagement = () => {
   const [selectedStaff, setSelectedStaff] = useState(null);
   const [showActionModal, setShowActionModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [actionType, setActionType] = useState('entry');
   const [notes, setNotes] = useState('');
   const [staffHistory, setStaffHistory] = useState([]);
   const [filterStatus, setFilterStatus] = useState('all');
-  const [permanentIdInput, setPermanentIdInput] = useState('');
+  const [staffForm, setStaffForm] = useState({
+    name: '',
+    permanentId: '',
+    role: 'staff',
+    other_role: '',
+    residentId: ''
+  });
+  const [formErrors, setFormErrors] = useState({});
 
   // Enhanced auth headers with error handling
   const getAuthHeaders = () => {
@@ -45,20 +54,32 @@ const SecurityStaffManagement = () => {
       return {
         headers: {
           Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        withCredentials: true
+          'Content-Type': 'application/json'
+        }
       };
     } catch (error) {
       console.error('Authentication error:', error);
-      toast.error('Please login to continue', {
-        position: 'top-right',
-        autoClose: 5000,
-      });
+      toast.error('Please login to continue');
       window.location.href = '/login';
       return {};
     }
+  };
+
+  // Validate staff form
+  const validateForm = () => {
+    const errors = {};
+    const { name, permanentId } = staffForm;
+
+    if (!name.trim()) {
+      errors.name = 'Name is required';
+    }
+
+    if (!permanentId.trim()) {
+      errors.permanentId = 'Permanent ID is required';
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   // Fetch all staff with enhanced error handling
@@ -66,11 +87,9 @@ const SecurityStaffManagement = () => {
     try {
       setLoading(true);
       const response = await axios.get(
-        `${API_BASE_URL}/admin/all`,
+        `${API_BASE_URL}/staff/admin/stats`,
         getAuthHeaders()
       );
-      
-      console.log('Staff fetch response:', response); // Debug log
       
       if (response.data?.success) {
         setStaff(response.data.data || []);
@@ -78,15 +97,10 @@ const SecurityStaffManagement = () => {
         throw new Error(response.data?.message || 'Invalid response format');
       }
     } catch (error) {
-      console.error('Staff fetch error:', {
-        error: error.message,
-        response: error.response?.data,
-        config: error.config
-      });
+      console.error('Staff fetch error:', error);
       
       let errorMessage = 'Failed to load staff';
       if (error.response) {
-        // Handle specific HTTP errors
         if (error.response.status === 401) {
           errorMessage = 'Session expired. Please login again.';
           localStorage.removeItem('token');
@@ -98,10 +112,7 @@ const SecurityStaffManagement = () => {
         errorMessage = 'Network error. Please check your connection.';
       }
       
-      toast.error(errorMessage, {
-        position: 'top-right',
-        autoClose: 5000,
-      });
+      toast.error(errorMessage, { position: 'top-right', autoClose: 5000 });
     } finally {
       setLoading(false);
     }
@@ -110,69 +121,145 @@ const SecurityStaffManagement = () => {
   // Handle staff entry/exit with validation
   const handleStaffAction = async () => {
     if (!selectedStaff) {
-      toast.error('No staff member selected', { position: 'top-right' });
+      toast.error('No staff member selected', { position: 'top-right', autoClose: 3000 });
       return;
     }
     
     try {
       setLoading(true);
       
-      
+      const endpoint = actionType === 'entry' ? 'entry' : 'exit';
       const response = await axios.post(
-        `${API_BASE_URL}/staff/entry`,
-        
+        `${API_BASE_URL}/staff/${endpoint}`,
+        { permanentId: selectedStaff.permanentId, notes },
         getAuthHeaders()
       );
-
-      console.log('Action response:', response); // Debug log
       
-      if (response.data?.success) {
-        toast.success(
-          `Staff ${actionType === 'entry' ? 'entry' : 'exit'} recorded successfully`,
-          { position: 'top-right', autoClose: 3000 }
-        );
+      if (response.status >= 200 && response.status < 300) {
+        const successMessage = response.data?.message || `Staff ${actionType} recorded successfully`;
+        toast.success(successMessage, { position: 'top-right', autoClose: 3000 });
+        
+        // Update the staff member's status in the local state
+        setStaff(prevStaff => prevStaff.map(member => {
+          if (member._id === selectedStaff._id) {
+            return {
+              ...member,
+              isInside: actionType === 'entry',
+              lastEntryTime: actionType === 'entry' ? new Date().toISOString() : member.lastEntryTime,
+              lastExitTime: actionType === 'exit' ? new Date().toISOString() : member.lastExitTime
+            };
+          }
+          return member;
+        }));
         
         // Reset modal state
         setShowActionModal(false);
         setNotes('');
-        setPermanentIdInput('');
         
-        // Refresh staff list
-        await fetchStaff();
+        // If history modal is open, update the history as well
+        if (showHistoryModal) {
+          const newLog = {
+            staffId: selectedStaff.permanentId,
+            action: actionType,
+            timestamp: new Date().toISOString(),
+            notes: notes || '',
+            entryTime: actionType === 'entry' ? new Date().toISOString() : null,
+            exitTime: actionType === 'exit' ? new Date().toISOString() : null
+          };
+          // Add new entry to the end of history (chronological order)
+          setStaffHistory(prev => [...prev, newLog]);
+        }
       } else {
         throw new Error(response.data?.message || `Action ${actionType} failed`);
       }
     } catch (error) {
-      console.error('Action error:', {
-        error: error.message,
-        response: error.response?.data,
-        config: error.config
-      });
+      console.error('Action error:', error);
       
       let errorMessage = `Failed to record ${actionType}`;
       if (error.response) {
-        if (error.response.status === 401) {
+        if (error.response.status === 400) {
+          errorMessage = error.response.data?.message || 'Invalid request. Please check the staff status.';
+        } else if (error.response.status === 401) {
           errorMessage = 'Session expired. Please login again.';
           localStorage.removeItem('token');
           window.location.href = '/login';
         } else if (error.response.data?.message) {
           errorMessage = error.response.data.message;
         }
+      } else if (error.message) {
+        errorMessage = error.message;
+      } else if (error.request) {
+        errorMessage = 'No response received from server';
       }
       
-      toast.error(errorMessage, {
-        position: 'top-right',
-        autoClose: 5000,
-      });
+      toast.error(errorMessage, { position: 'top-right', autoClose: 5000 });
     } finally {
       setLoading(false);
     }
   };
 
-  // Get staff logs with caching
+  // Register new staff
+  const registerStaff = async () => {
+    if (!validateForm()) return;
+
+    try {
+      setLoading(true);
+      
+      const response = await axios.post(
+        `${API_BASE_URL}/staff/register`,
+        {
+          name: staffForm.name,
+          permanentId: staffForm.permanentId,
+          role: staffForm.role,
+          other_role: staffForm.role === 'other' ? staffForm.other_role : undefined,
+          residentId: staffForm.residentId || null
+        },
+        getAuthHeaders()
+      );
+
+      toast.success('Staff registered successfully', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+
+      // Reset form and modal state
+      setShowRegisterModal(false);
+      setStaffForm({
+        name: '',
+        permanentId: '',
+        role: 'staff',
+        other_role: '',
+        residentId: ''
+      });
+      setFormErrors({});
+      
+      // Refresh staff list
+      fetchStaff();
+    } catch (error) {
+      console.error('Error registering staff:', error);
+      
+      // Handle backend validation errors
+      if (error.response?.data?.errors) {
+        const backendErrors = {};
+        error.response.data.errors.forEach(err => {
+          backendErrors[err.path] = err.msg;
+        });
+        setFormErrors(backendErrors);
+      } else {
+        toast.error(
+          error.response?.data?.message || 'Failed to register staff',
+          { position: 'top-right', autoClose: 5000 }
+        );
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Get staff logs in chronological order (oldest first)
   const fetchStaffHistory = async (permanentId) => {
     if (!permanentId) {
-      toast.error('No staff ID provided', { position: 'top-right' });
+      toast.error('No staff ID provided', { position: 'top-right', autoClose: 3000 });
       return;
     }
     
@@ -183,20 +270,20 @@ const SecurityStaffManagement = () => {
         getAuthHeaders()
       );
       
-      console.log('History response:', response); // Debug log
-      
-      if (response.data?.success) {
-        setStaffHistory(response.data.data?.movement_logs || []);
+      if (response.data) {
+        // Sort history by timestamp (oldest first)
+        const sortedHistory = (response.data.history || []).sort((a, b) => {
+          const dateA = a.entryTime || a.exitTime || 0;
+          const dateB = b.entryTime || b.exitTime || 0;
+          return new Date(dateA) - new Date(dateB);
+        });
+        setStaffHistory(sortedHistory);
         setShowHistoryModal(true);
       } else {
-        throw new Error(response.data?.message || 'Invalid history data format');
+        throw new Error('Invalid history data format');
       }
     } catch (error) {
-      console.error('History fetch error:', {
-        error: error.message,
-        response: error.response?.data,
-        config: error.config
-      });
+      console.error('History fetch error:', error);
       
       let errorMessage = 'Failed to load history';
       if (error.response) {
@@ -209,10 +296,7 @@ const SecurityStaffManagement = () => {
         }
       }
       
-      toast.error(errorMessage, {
-        position: 'top-right',
-        autoClose: 5000,
-      });
+      toast.error(errorMessage, { position: 'top-right', autoClose: 5000 });
     } finally {
       setLoading(false);
     }
@@ -224,7 +308,6 @@ const SecurityStaffManagement = () => {
     try {
       const date = new Date(dateString);
       return date.toLocaleString('en-IN', {
-        timeZone: 'Asia/Kolkata',
         day: '2-digit',
         month: 'short',
         year: 'numeric',
@@ -233,7 +316,7 @@ const SecurityStaffManagement = () => {
       });
     } catch (e) {
       console.error('Date formatting error:', e);
-      return dateString; // Return raw string if formatting fails
+      return dateString;
     }
   };
 
@@ -252,12 +335,12 @@ const SecurityStaffManagement = () => {
     }
   };
 
-  // Filter staff with memoization (consider using useMemo in production)
+  // Filter staff
   const filteredStaff = staff.filter(member => {
     // Filter by status
     if (filterStatus !== 'all') {
-      if (filterStatus === 'inside' && member.currentStatus !== 'inside') return false;
-      if (filterStatus === 'outside' && member.currentStatus !== 'outside') return false;
+      if (filterStatus === 'inside' && !member.isInside) return false;
+      if (filterStatus === 'outside' && member.isInside) return false;
       if (filterStatus === 'blocked' && member.status !== 'blocked') return false;
     }
     
@@ -268,8 +351,7 @@ const SecurityStaffManagement = () => {
         (member.permanentId?.toLowerCase().includes(searchLower)) ||
         (member.name?.toLowerCase().includes(searchLower)) ||
         (member.role && member.role.toLowerCase().includes(searchLower)) ||
-        (member.resident?.name && member.resident.name.toLowerCase().includes(searchLower)) ||
-        (member.flat_no && member.flat_no.toLowerCase().includes(searchLower))
+        (member.residentId?.name && member.residentId.name.toLowerCase().includes(searchLower))
       );
     }
     
@@ -303,11 +385,10 @@ const SecurityStaffManagement = () => {
                 {loading ? (
                   <Loader2 className="animate-spin h-5 w-5" />
                 ) : (
-                  <>
-                    <span>Refresh</span>
-                  </>
+                  'Refresh'
                 )}
               </button>
+           
             </div>
           </div>
         </div>
@@ -349,94 +430,10 @@ const SecurityStaffManagement = () => {
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search by name, ID, role, or flat..."
+                  placeholder="Search by name, ID, role, or resident..."
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-sm"
                 />
               </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Action Section */}
-        <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">Quick Staff Action</h2>
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Permanent ID</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <UserCheck className="text-gray-400 h-5 w-5" />
-                </div>
-                <input
-                  type="text"
-                  value={permanentIdInput}
-                  onChange={(e) => setPermanentIdInput(e.target.value)}
-                  placeholder="Enter staff permanent ID"
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-sm"
-                />
-              </div>
-            </div>
-            <div className="flex items-end gap-2">
-              <button
-                onClick={async () => {
-                  if (!permanentIdInput.trim()) {
-                    toast.error('Please enter a valid staff ID', { position: 'top-right' });
-                    return;
-                  }
-                  
-                  try {
-                    setLoading(true);
-                    const response = await axios.get(
-                      `${API_BASE_URL}/staff/verify/${permanentIdInput.trim()}`,
-                      getAuthHeaders()
-                    );
-                    
-                    console.log('Verify response:', response); // Debug log
-                    
-                    if (response.data?.success) {
-                      setSelectedStaff(response.data.data);
-                      setActionType(response.data.data.currentStatus === 'inside' ? 'exit' : 'entry');
-                      setShowActionModal(true);
-                    } else {
-                      throw new Error(response.data?.message || 'Verification failed');
-                    }
-                  } catch (error) {
-                    console.error('Verification error:', {
-                      error: error.message,
-                      response: error.response?.data,
-                      config: error.config
-                    });
-                    
-                    let errorMessage = 'Invalid staff ID or staff is blocked';
-                    if (error.response) {
-                      if (error.response.status === 401) {
-                        errorMessage = 'Session expired. Please login again.';
-                        localStorage.removeItem('token');
-                        window.location.href = '/login';
-                      } else if (error.response.data?.message) {
-                        errorMessage = error.response.data.message;
-                      }
-                    }
-                    
-                    toast.error(errorMessage, {
-                      position: 'top-right',
-                      autoClose: 5000,
-                    });
-                  } finally {
-                    setLoading(false);
-                  }
-                }}
-                disabled={loading || !permanentIdInput.trim()}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
-              >
-                {loading ? (
-                  <Loader2 className="animate-spin h-5 w-5" />
-                ) : (
-                  <>
-                    <span>Verify Staff</span>
-                  </>
-                )}
-              </button>
             </div>
           </div>
         </div>
@@ -481,8 +478,8 @@ const SecurityStaffManagement = () => {
                         <div className="text-sm text-gray-900 capitalize">
                           {member.role === 'other' ? member.other_role : member.role}
                         </div>
-                        {member.flat_no && (
-                          <div className="text-sm text-gray-500">Flat {member.flat_no}</div>
+                        {member.residentId?.name && (
+                          <div className="text-sm text-gray-500">Resident: {member.residentId.name}</div>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -490,21 +487,21 @@ const SecurityStaffManagement = () => {
                           className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full items-center gap-1 ${
                             member.status === 'blocked'
                               ? 'bg-purple-100 text-purple-800'
-                              : member.currentStatus === 'inside'
+                              : member.isInside
                                 ? 'bg-green-100 text-green-800'
                                 : 'bg-red-100 text-red-800'
                           }`}
                         >
-                          {member.status === 'blocked' ? 'BLOCKED' : member.currentStatus?.toUpperCase() || 'UNKNOWN'}
-                          {getStatusIcon(member.status === 'blocked' ? 'blocked' : member.currentStatus)}
+                          {member.status === 'blocked' ? 'BLOCKED' : member.isInside ? 'INSIDE' : 'OUTSIDE'}
+                          {getStatusIcon(member.status === 'blocked' ? 'blocked' : member.isInside ? 'inside' : 'outside')}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-600">
-                          {member.lastAction && (
+                          {member.lastEntryTime && (
                             <>
-                              <div className="capitalize">{member.lastAction?.toLowerCase()}</div>
-                              <div className="text-gray-500">{formatDate(member.lastTimestamp)}</div>
+                              <div>{member.isInside ? 'Entered' : 'Exited'}</div>
+                              <div className="text-gray-500">{formatDate(member.isInside ? member.lastEntryTime : member.lastExitTime)}</div>
                             </>
                           )}
                         </div>
@@ -515,16 +512,16 @@ const SecurityStaffManagement = () => {
                             <button
                               onClick={() => {
                                 setSelectedStaff(member);
-                                setActionType(member.currentStatus === 'inside' ? 'exit' : 'entry');
+                                setActionType(member.isInside ? 'exit' : 'entry');
                                 setShowActionModal(true);
                               }}
                               className={`${
-                                member.currentStatus === 'inside'
+                                member.isInside
                                   ? 'text-red-600 hover:text-red-900'
                                   : 'text-green-600 hover:text-green-900'
                               } transition-colors`}
                             >
-                              {member.currentStatus === 'inside' ? 'Exit' : 'Entry'}
+                              {member.isInside ? 'Exit' : 'Entry'}
                             </button>
                           )}
                           <button
@@ -594,12 +591,14 @@ const SecurityStaffManagement = () => {
                     <div>
                       <p className="text-sm text-gray-500">Resident</p>
                       <p className="font-medium text-sm">
-                        {selectedStaff.resident?.name || 'N/A'}
+                        {selectedStaff.residentId?.name || 'N/A'}
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500">Flat</p>
-                      <p className="font-medium text-sm">{selectedStaff.flat_no || 'N/A'}</p>
+                      <p className="text-sm text-gray-500">Status</p>
+                      <p className="font-medium text-sm">
+                        {selectedStaff.status === 'blocked' ? 'Blocked' : selectedStaff.isInside ? 'Inside' : 'Outside'}
+                      </p>
                     </div>
                   </div>
 
@@ -654,6 +653,8 @@ const SecurityStaffManagement = () => {
           </div>
         )}
 
+       
+
         {/* History Modal */}
         {showHistoryModal && selectedStaff && (
           <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
@@ -677,7 +678,7 @@ const SecurityStaffManagement = () => {
                     {[
                       { label: 'Name', value: selectedStaff.name },
                       { label: 'Role', value: selectedStaff.role === 'other' ? selectedStaff.other_role : selectedStaff.role, capitalize: true },
-                      { label: 'Status', value: selectedStaff.status === 'blocked' ? 'blocked' : selectedStaff.currentStatus, status: true }
+                      { label: 'Status', value: selectedStaff.status === 'blocked' ? 'blocked' : selectedStaff.isInside ? 'inside' : 'outside', status: true }
                     ].map((item) => (
                       <div key={item.label} className="flex flex-col">
                         <p className="text-sm text-gray-500">{item.label}</p>
@@ -711,36 +712,41 @@ const SecurityStaffManagement = () => {
                     <div className="space-y-4">
                       {staffHistory.map((log, index) => (
                         <div key={index} className="border-l-2 border-blue-200 pl-4 py-2">
-                          <div className="flex justify-between">
-                            <div>
-                              <p className="font-medium flex items-center gap-2 text-sm">
-                                {log.action === 'Entered' ? (
-                                  <span className="text-green-600">
-                                    <ArrowRightCircle className="inline mr-1" size={16} />
-                                    Entered Premises
-                                  </span>
-                                ) : log.action === 'Exited' ? (
-                                  <span className="text-red-600">
-                                    <ArrowLeftCircle className="inline mr-1" size={16} />
-                                    Exited Premises
-                                  </span>
-                                ) : (
-                                  <span className="capitalize">{log.action?.toLowerCase()}</span>
-                                )}
-                              </p>
-                              <p className="text-sm text-gray-500">{formatDate(log.timestamp)}</p>
-                            </div>
-                            {log.verified_by && (
-                              <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                                Verified by {log.verified_by.name}
-                              </div>
-                            )}
-                          </div>
-                          {log.notes && (
-                            <p className="text-sm mt-1 text-gray-600">
-                              <span className="font-medium">Notes:</span> {log.notes}
-                            </p>
-                          )}
+                          <div key={index} className="border-l-2 border-blue-200 pl-4 py-2">
+  <div className="flex justify-between">
+    <div>
+      <p className="font-medium flex items-center gap-2 text-sm">
+        {log.entryTime && !log.exitTime ? (
+          <span className="text-green-600">
+            <ArrowRightCircle className="inline mr-1" size={16} />
+            Entered Premises
+          </span>
+        ) : log.exitTime ? (
+          <span className="text-red-600">
+            <ArrowLeftCircle className="inline mr-1" size={16} />
+            Exited Premises
+          </span>
+        ) : (
+          <span className="capitalize">{log.action?.toLowerCase()}</span>
+        )}
+      </p>
+      <p className="text-sm text-gray-500">
+        {formatDate(log.entryTime || log.exitTime)}
+      </p>
+      {log.notes && (
+        <p className="text-xs text-gray-500 mt-1 bg-gray-100 p-2 rounded">
+          <span className="font-medium">Note:</span> {log.notes}
+        </p>
+      )}
+    </div>
+    {log.securityGuard && (
+      <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+        Verified by Security
+      </div>
+    )}
+  </div>
+</div>
+              
                         </div>
                       ))}
                     </div>

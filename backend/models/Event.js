@@ -28,8 +28,8 @@ const eventSchema = new mongoose.Schema({
         ref: "User",
         required: true
     },
-    imageUrl: {
-        type: String
+    image: {
+        type: String 
     },
     isCancelled: {
         type: Boolean,
@@ -41,12 +41,7 @@ const eventSchema = new mongoose.Schema({
     toObject: { virtuals: true }
 });
 
-
-// Add pagination plugin
 eventSchema.plugin(mongoosePaginate);
-
-
-// Add index for better query performance
 eventSchema.index({ date: 1, isCancelled: 1 });
 
 module.exports = mongoose.model("Event", eventSchema);

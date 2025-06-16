@@ -1,328 +1,715 @@
-import React, { useState, useEffect } from 'react';
-import { Search, UserPlus, UserMinus, Check, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { useEffect, useState } from "react";
+import axios from "axios";
+import { FaSearch, FaFilter, FaTimes, FaEdit, FaTrash } from "react-icons/fa";
+import { IoCheckmarkDone, IoClose } from "react-icons/io5";
+import { toast } from "react-toastify";
+import { motion, AnimatePresence } from "framer-motion";
 
-const ManageGuardsPage = () => {
-  const [guards, setGuards] = useState([]);
-  const [availableGuards, setAvailableGuards] = useState([]);
-  const [searchAssigned, setSearchAssigned] = useState('');
-  const [searchAvailable, setSearchAvailable] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
-  const [showAssignModal, setShowAssignModal] = useState(false);
-  const [showRemoveConfirm, setShowRemoveConfirm] = useState(null);
-  const [selectedGuard, setSelectedGuard] = useState(null);
-  const [sortBy, setSortBy] = useState('name');
-  const [sortOrder, setSortOrder] = useState('asc');
+const ManageSecurityPage = () => {
+  const [securityUsers, setSecurityUsers] = useState([]);
+  const [error, setError] = useState("");
+  const [rejectRemark, setRejectRemark] = useState("");
+  const [selectedRejectId, setSelectedRejectId] = useState(null);
+  const [selectedEditUser, setSelectedEditUser] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+  const [loading, setLoading] = useState(true);
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    status: "all",
+    sortBy: "newest"
+  });
 
-  // Simulate fetching data
+  // Edit form state
+  const [editForm, setEditForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    badgeNumber: ""
+  });
+
   useEffect(() => {
-    const fetchData = async () => {
-      // This would be replaced with actual API calls
-      setTimeout(() => {
-        setGuards([
-          { id: 1, name: 'John Smith', badge: 'G-1001', shift: 'Morning', status: 'Active', lastActive: '2025-04-02' },
-          { id: 2, name: 'Sarah Johnson', badge: 'G-1002', shift: 'Night', status: 'Active', lastActive: '2025-04-03' },
-          { id: 3, name: 'Michael Chen', badge: 'G-1003', shift: 'Evening', status: 'Active', lastActive: '2025-04-01' },
-          { id: 4, name: 'Emma Williams', badge: 'G-1004', shift: 'Morning', status: 'On Leave', lastActive: '2025-03-28' },
-        ]);
-        
-        setAvailableGuards([
-          { id: 5, name: 'Robert Brown', badge: 'G-1005', shift: 'Flexible', status: 'Available' },
-          { id: 6, name: 'Lisa Garcia', badge: 'G-1006', shift: 'Morning', status: 'Available' },
-          { id: 7, name: 'David Wilson', badge: 'G-1007', shift: 'Night', status: 'Available' },
-        ]);
-        
-        setIsLoading(false);
-      }, 800);
-    };
-
-    fetchData();
+    fetchSecurityUsers();
   }, []);
 
-  const handleSort = (key) => {
-    if (sortBy === key) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(key);
-      setSortOrder('asc');
+  const fetchSecurityUsers = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.error("Unauthorized: Token missing!");
+        return;
+      }
+
+      const response = await axios.get("http://localhost:5000/api/admin/users", {
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 5000
+      });
+
+      if (response.data?.success && response.data.users) {
+        // Filter users with security role
+        const securityUsers = response.data.users.filter(user => user.role === 'security');
+        setSecurityUsers(securityUsers);
+      } else {
+        throw new Error("Invalid response format");
+      }
+    } catch (err) {
+      setError("Failed to fetch security personnel.");
+      toast.error("Failed to fetch security personnel.");
+      console.error("Error fetching security personnel:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const sortedGuards = [...guards].sort((a, b) => {
-    if (a[sortBy] < b[sortBy]) return sortOrder === 'asc' ? -1 : 1;
-    if (a[sortBy] > b[sortBy]) return sortOrder === 'asc' ? 1 : -1;
-    return 0;
+  const approveUser = async (userId) => {
+    const toastId = toast.loading("Approving security personnel...");
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.update(toastId, {
+          render: "Unauthorized: Token missing!",
+          type: "error",
+          isLoading: false,
+          autoClose: 3000
+        });
+        return;
+      }
+
+      const response = await axios.put(
+        `http://localhost:5000/api/admin/approve/${userId}`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 5000
+        }
+      );
+
+      toast.update(toastId, {
+        render: response.data.message,
+        type: "success",
+        isLoading: false,
+        autoClose: 3000
+      });
+
+      setSecurityUsers((prev) =>
+        prev.map((user) =>
+          user._id === userId ? { ...user, approval_status: "approved" } : user
+        )
+      );
+    } catch (err) {
+      toast.update(toastId, {
+        render: err.response?.data?.message || "Approval failed. Try again.",
+        type: "error",
+        isLoading: false,
+        autoClose: 3000
+      });
+      console.error("Approval error:", err);
+    }
+  };
+
+  const rejectUser = async () => {
+    if (!rejectRemark.trim()) {
+      toast.warn("Please enter a remark for rejection.");
+      return;
+    }
+
+    const toastId = toast.loading("Rejecting security personnel...");
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.update(toastId, {
+          render: "Unauthorized: Token missing!",
+          type: "error",
+          isLoading: false,
+          autoClose: 3000
+        });
+        return;
+      }
+
+      const response = await axios.put(
+        `http://localhost:5000/api/admin/reject/${selectedRejectId}`,
+        { remark: rejectRemark },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 5000
+        }
+      );
+
+      toast.update(toastId, {
+        render: response.data.message,
+        type: "success",
+        isLoading: false,
+        autoClose: 3000
+      });
+
+      setSecurityUsers((prev) =>
+        prev.map((user) =>
+          user._id === selectedRejectId
+            ? { ...user, approval_status: "rejected", remark: rejectRemark }
+            : user
+        )
+      );
+
+      setRejectRemark("");
+      setSelectedRejectId(null);
+    } catch (err) {
+      toast.update(toastId, {
+        render: err.response?.data?.message || "Rejection failed. Try again.",
+        type: "error",
+        isLoading: false,
+        autoClose: 3000
+      });
+      console.error("Rejection error:", err);
+    }
+  };
+
+  const updateUser = async () => {
+    const toastId = toast.loading("Updating security personnel...");
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.update(toastId, {
+          render: "Unauthorized: Token missing!",
+          type: "error",
+          isLoading: false,
+          autoClose: 3000
+        });
+        return;
+      }
+
+      const response = await axios.put(
+        `http://localhost:5000/api/admin/update/${selectedEditUser._id}`,
+        editForm,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 5000
+        }
+      );
+
+      toast.update(toastId, {
+        render: response.data.message,
+        type: "success",
+        isLoading: false,
+        autoClose: 3000
+      });
+
+      setSecurityUsers((prev) =>
+        prev.map((user) =>
+          user._id === selectedEditUser._id ? { ...user, ...editForm } : user
+        )
+      );
+
+      setSelectedEditUser(null);
+    } catch (err) {
+      toast.update(toastId, {
+        render: err.response?.data?.message || "Update failed. Try again.",
+        type: "error",
+        isLoading: false,
+        autoClose: 3000
+      });
+      console.error("Update error:", err);
+    }
+  };
+
+  const deleteUser = async (userId) => {
+    if (!window.confirm("Are you sure you want to delete this security personnel?")) return;
+
+    const toastId = toast.loading("Deleting security personnel...");
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.update(toastId, {
+          render: "Unauthorized: Token missing!",
+          type: "error",
+          isLoading: false,
+          autoClose: 3000
+        });
+        return;
+      }
+
+      const response = await axios.delete(
+        `http://localhost:5000/api/admin/remove/${userId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 5000
+        }
+      );
+
+      toast.update(toastId, {
+        render: response.data.message,
+        type: "success",
+        isLoading: false,
+        autoClose: 3000
+      });
+
+      setSecurityUsers((prev) => prev.filter((user) => user._id !== userId));
+    } catch (err) {
+      toast.update(toastId, {
+        render: err.response?.data?.message || "Deletion failed. Try again.",
+        type: "error",
+        isLoading: false,
+        autoClose: 3000
+      });
+      console.error("Deletion error:", err);
+    }
+  };
+
+  // Apply all filters
+  const filteredUsers = securityUsers.filter((user) => {
+    // Search filter
+    const matchesSearch = Object.values(user).some(
+      (value) =>
+        value &&
+        typeof value === "string" &&
+        value.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    // Status filter
+    const matchesStatus = 
+      filters.status === "all" || 
+      user.approval_status === filters.status;
+
+    return matchesSearch && matchesStatus;
   });
 
-  const filteredAssignedGuards = sortedGuards.filter(guard => 
-    guard.name.toLowerCase().includes(searchAssigned.toLowerCase()) ||
-    guard.badge.toLowerCase().includes(searchAssigned.toLowerCase())
-  );
+  // Sort users
+  const sortedUsers = [...filteredUsers].sort((a, b) => {
+    if (filters.sortBy === "newest") {
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    } else {
+      return new Date(a.createdAt) - new Date(b.createdAt);
+    }
+  });
 
-  const filteredAvailableGuards = availableGuards.filter(guard => 
-    guard.name.toLowerCase().includes(searchAvailable.toLowerCase()) ||
-    guard.badge.toLowerCase().includes(searchAvailable.toLowerCase())
-  );
+  // Pagination logic
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentUsers = sortedUsers.slice(indexOfFirstItem, indexOfLastItem);
 
-  const handleAssignGuard = (guard) => {
-    // This would be replaced with an API call
-    setGuards([...guards, {...guard, status: 'Active', lastActive: new Date().toISOString().split('T')[0]}]);
-    setAvailableGuards(availableGuards.filter(g => g.id !== guard.id));
-    setShowAssignModal(false);
+  const paginate = (pageNumber) => {
+    if (pageNumber > 0 && pageNumber <= Math.ceil(filteredUsers.length / itemsPerPage)) {
+      setCurrentPage(pageNumber);
+    }
   };
 
-  const handleRemoveGuard = (id) => {
-    // This would be replaced with an API call
-    const guardToRemove = guards.find(g => g.id === id);
-    setAvailableGuards([...availableGuards, {...guardToRemove, status: 'Available'}]);
-    setGuards(guards.filter(g => g.id !== id));
-    setShowRemoveConfirm(null);
+  // Reset all filters
+  const resetFilters = () => {
+    setFilters({
+      status: "all",
+      sortBy: "newest"
+    });
+    setSearchQuery("");
+  setCurrentPage(1);
   };
 
-  const SortIcon = ({ column }) => {
-    if (sortBy !== column) return null;
-    return sortOrder === 'asc' ? <ChevronUp size={16} /> : <ChevronDown size={16} />;
+  // Open edit modal and set form data
+  const openEditModal = (user) => {
+    setSelectedEditUser(user);
+    setEditForm({
+      name: user.name || "",
+      email: user.email || "",
+      phone: user.phone || "",
+      badgeNumber: user.badgeNumber || ""
+    });
   };
-
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-screen bg-background">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
 
   return (
-    <div className="min-h-screen bg-background text-text">
-      {/* Header */}
-      <header className="bg-primary text-white p-4 shadow-md">
-        <div className="container mx-auto">
-          <h1 className="text-2xl font-bold">Manage Guards</h1>
-          <p className="text-sm opacity-80">Assign or remove guards from duty roster</p>
-        </div>
-      </header>
-
-      <div className="container mx-auto py-6 px-4">
-        {/* Currently Assigned Guards */}
-        <div className="bg-white rounded-lg shadow-md p-4 mb-8">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
-            <h2 className="text-xl font-semibold text-primary mb-2 sm:mb-0">Currently Assigned Guards</h2>
-            <div className="relative w-full sm:w-64">
-              <input
-                type="text"
-                placeholder="Search guards..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-                value={searchAssigned}
-                onChange={(e) => setSearchAssigned(e.target.value)}
-              />
-              <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
-            </div>
+    <div className="p-6 mt-10 md:p-10 min-h-screen bg-gray-50">
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="max-w-7xl mx-auto"
+      >
+        <h2 className="text-2xl md:text-3xl font-bold mb-6 text-gray-800 text-center">
+          Manage Security 
+        </h2>
+        
+        {error && (
+          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded">
+            <p>{error}</p>
           </div>
-          
-          <div className="overflow-x-auto">
-            <table className="min-w-full bg-white">
-              <thead>
-                <tr className="bg-gray-100 text-gray-600 text-left">
-                  <th className="py-3 px-4 font-semibold cursor-pointer" onClick={() => handleSort('name')}>
-                    <div className="flex items-center">
-                      Name <SortIcon column="name" />
-                    </div>
-                  </th>
-                  <th className="py-3 px-4 font-semibold cursor-pointer" onClick={() => handleSort('badge')}>
-                    <div className="flex items-center">
-                      Badge <SortIcon column="badge" />
-                    </div>
-                  </th>
-                  <th className="py-3 px-4 font-semibold cursor-pointer" onClick={() => handleSort('shift')}>
-                    <div className="flex items-center">
-                      Shift <SortIcon column="shift" />
-                    </div>
-                  </th>
-                  <th className="py-3 px-4 font-semibold cursor-pointer" onClick={() => handleSort('status')}>
-                    <div className="flex items-center">
-                      Status <SortIcon column="status" />
-                    </div>
-                  </th>
-                  <th className="py-3 px-4 font-semibold cursor-pointer" onClick={() => handleSort('lastActive')}>
-                    <div className="flex items-center">
-                      Last Active <SortIcon column="lastActive" />
-                    </div>
-                  </th>
-                  <th className="py-3 px-4 font-semibold text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredAssignedGuards.length > 0 ? (
-                  filteredAssignedGuards.map((guard) => (
-                    <tr key={guard.id} className="border-t border-gray-200 hover:bg-gray-50">
-                      <td className="py-3 px-4">{guard.name}</td>
-                      <td className="py-3 px-4">{guard.badge}</td>
-                      <td className="py-3 px-4">{guard.shift}</td>
-                      <td className="py-3 px-4">
-                        <span className={`inline-block px-2 py-1 text-xs font-semibold rounded-full ${
-                          guard.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {guard.status}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">{guard.lastActive}</td>
-                      <td className="py-3 px-4 text-right">
-                        {showRemoveConfirm === guard.id ? (
-                          <div className="flex justify-end space-x-2">
-                            <button 
-                              onClick={() => handleRemoveGuard(guard.id)}
-                              className="p-1 bg-red-500 text-white rounded-md hover:bg-red-600"
+        )}
+
+        {/* Search and Filter Bar */}
+        <div className="mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
+          <div className="relative w-full md:w-1/2">
+            <input
+              type="text"
+              placeholder="Search by name, email ..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="border p-3 w-full rounded-lg shadow-sm pl-10 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700"
+            />
+            <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" />
+          </div>
+
+          <div className="flex gap-2 w-full md:w-auto">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <FaFilter /> Filters
+            </button>
+
+            {(filters.status !== "all" || filters.sortBy !== "newest") && (
+              <button
+                onClick={resetFilters}
+                className="flex items-center gap-2 bg-gray-200 text-gray-700 px-4 py-3 rounded-lg hover:bg-gray-300 transition-colors"
+              >
+                <FaTimes /> Clear
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Filter Panel */}
+        <AnimatePresence>
+          {showFilters && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.3 }}
+              className="bg-white p-4 rounded-lg shadow-md mb-6 overflow-hidden border border-gray-200"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Status Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Approval Status
+                  </label>
+                  <select
+                    value={filters.status}
+                    onChange={(e) => setFilters({...filters, status: e.target.value})}
+                    className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
+                </div>
+
+                {/* Sort Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Sort By
+                  </label>
+                  <select
+                    value={filters.sortBy}
+                    onChange={(e) => setFilters({...filters, sortBy: e.target.value})}
+                    className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="newest">Newest First</option>
+                    <option value="oldest">Oldest First</option>
+                  </select>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Loading State */}
+        {loading ? (
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+          </div>
+        ) : (
+          <>
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <div className="bg-white p-4 rounded-lg shadow-sm border-l-4 border-blue-500">
+                <h3 className="text-sm text-gray-500">Total Security Personnel</h3>
+                <p className="text-2xl font-bold text-gray-800">{securityUsers.length}</p>
+              </div>
+              <div className="bg-white p-4 rounded-lg shadow-sm border-l-4 border-green-500">
+                <h3 className="text-sm text-gray-500">Approved</h3>
+                <p className="text-2xl font-bold text-gray-800">
+                  {securityUsers.filter(u => u.approval_status === "approved").length}
+                </p>
+              </div>
+              <div className="bg-white p-4 rounded-lg shadow-sm border-l-4 border-yellow-500">
+                <h3 className="text-sm text-gray-500">Pending</h3>
+                <p className="text-2xl font-bold text-gray-800">
+                  {securityUsers.filter(u => u.approval_status === "pending").length}
+                </p>
+              </div>
+              <div className="bg-white p-4 rounded-lg shadow-sm border-l-4 border-red-500">
+                <h3 className="text-sm text-gray-500">Rejected</h3>
+                <p className="text-2xl font-bold text-gray-800">
+                  {securityUsers.filter(u => u.approval_status === "rejected").length}
+                </p>
+              </div>
+            </div>
+
+            {/* Table */}
+            <div className="overflow-x-auto bg-white rounded-lg shadow-lg">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-blue-600">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                      Name
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                      Email
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                      Phone
+                    </th>
+                    
+                    <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {currentUsers.length > 0 ? (
+                    currentUsers.map((user) => (
+                      <motion.tr 
+                        key={user._id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 0.3 }}
+                        className="hover:bg-gray-50"
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-800 font-bold">
+                              {user.name?.charAt(0) || "S"}
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-gray-900 capitalize">
+                                {user.name || "N/A"}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {user.email || "N/A"}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {user.phone || "N/A"}
+                        </td>
+                        
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            user.approval_status === "approved"
+                              ? "bg-green-100 text-green-800"
+                              : user.approval_status === "rejected"
+                                ? "bg-red-100 text-red-800"
+                                : "bg-yellow-100 text-yellow-800"
+                          }`}>
+                            {user.approval_status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex gap-2">
+                            {user.approval_status === "pending" && (
+                              <>
+                                <button
+                                  onClick={() => approveUser(user._id)}
+                                  className="text-white bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm flex items-center gap-1"
+                                  title="Approve"
+                                >
+                                  <IoCheckmarkDone /> Approve
+                                </button>
+                                <button
+                                  onClick={() => setSelectedRejectId(user._id)}
+                                  className="text-white bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm flex items-center gap-1"
+                                  title="Reject"
+                                >
+                                  <IoClose /> Reject
+                                </button>
+                              </>
+                            )}
+                            <button
+                              onClick={() => openEditModal(user)}
+                              className="text-white bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm flex items-center gap-1"
+                              title="Edit"
                             >
-                              <Check size={16} />
+                              <FaEdit /> Edit
                             </button>
-                            <button 
-                              onClick={() => setShowRemoveConfirm(null)}
-                              className="p-1 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400"
+                            <button
+                              onClick={() => deleteUser(user._id)}
+                              className="text-white bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm flex items-center gap-1"
+                              title="Delete"
                             >
-                              <X size={16} />
+                              <FaTrash /> Delete
                             </button>
                           </div>
-                        ) : (
-                          <button 
-                            onClick={() => setShowRemoveConfirm(guard.id)}
-                            className="text-red-500 hover:text-red-700 flex items-center justify-center space-x-1"
-                          >
-                            <UserMinus size={16} />
-                            <span>Remove</span>
-                          </button>
-                        )}
+                        </td>
+                      </motion.tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
+                        No security personnel found matching your criteria
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="6" className="py-4 px-4 text-center text-gray-500">
-                      {searchAssigned ? "No guards match your search" : "No guards currently assigned"}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          
-          <div className="mt-4 flex justify-end">
-            <button 
-              onClick={() => setShowAssignModal(true)}
-              className="flex items-center space-x-2 bg-secondary hover:bg-secondary-dark text-white py-2 px-4 rounded-md transition duration-200"
-            >
-              <UserPlus size={18} />
-              <span>Assign New Guard</span>
-            </button>
-          </div>
-        </div>
-        
-        {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <div className="bg-white rounded-lg shadow-md p-4">
-            <h3 className="text-lg font-semibold text-primary mb-2">Total Guards</h3>
-            <p className="text-3xl font-bold text-secondary">{guards.length}</p>
-            <p className="text-sm text-gray-500">Currently assigned</p>
-          </div>
-          
-          <div className="bg-white rounded-lg shadow-md p-4">
-            <h3 className="text-lg font-semibold text-primary mb-2">Active Status</h3>
-            <p className="text-3xl font-bold text-green-600">
-              {guards.filter(g => g.status === 'Active').length}
-            </p>
-            <p className="text-sm text-gray-500">Guards on duty</p>
-          </div>
-          
-          <div className="bg-white rounded-lg shadow-md p-4">
-            <h3 className="text-lg font-semibold text-primary mb-2">Available Guards</h3>
-            <p className="text-3xl font-bold text-yellow-600">{availableGuards.length}</p>
-            <p className="text-sm text-gray-500">Ready for assignment</p>
-          </div>
-        </div>
-      </div>
+                  )}
+                </tbody>
+              </table>
+            </div>
 
-      {/* Assign Guard Modal */}
-      {showAssignModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-lg max-w-lg w-full max-h-screen overflow-y-auto">
-            <div className="p-4 border-b border-gray-200">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold text-primary">Assign New Guard</h3>
-                <button 
-                  onClick={() => setShowAssignModal(false)}
-                  className="text-gray-500 hover:text-gray-700"
+            {/* Reject Modal */}
+            <AnimatePresence>
+              {selectedRejectId && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
                 >
-                  <X size={20} />
+                  <motion.div
+                    initial={{ scale: 0.9, y: 20 }}
+                    animate={{ scale: 1, y: 0 }}
+                    exit={{ scale: 0.9, y: 20 }}
+                    className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md"
+                  >
+                    <h3 className="text-lg font-bold mb-4 text-gray-800">Reject Security Personnel</h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Please provide a reason for rejecting this security personnel:
+                    </p>
+                    <textarea
+                      className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 mb-4"
+                      rows="4"
+                      placeholder="Enter rejection reason..."
+                      value={rejectRemark}
+                      onChange={(e) => setRejectRemark(e.target.value)}
+                    />
+                    <div className="flex justify-end gap-3">
+                      <button
+                        onClick={() => {
+                          setSelectedRejectId(null);
+                          setRejectRemark("");
+                        }}
+                        className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={rejectUser}
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                      >
+                        Confirm Reject
+                      </button>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Edit Modal */}
+            <AnimatePresence>
+              {selectedEditUser && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+                >
+                  <motion.div
+                    initial={{ scale: 0.9, y: 20 }}
+                    animate={{ scale: 1, y: 0 }}
+                    exit={{ scale: 0.9, y: 20 }}
+                    className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md"
+                  >
+                    <h3 className="text-lg font-bold mb-4 text-gray-800">Edit Security Personnel</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                        <input
+                          type="text"
+                          className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                          value={editForm.name}
+                          onChange={(e) => setEditForm({...editForm, name: e.target.value})}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                        <input
+                          type="email"
+                          className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                          value={editForm.email}
+                          onChange={(e) => setEditForm({...editForm, email: e.target.value})}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                        <input
+                          type="tel"
+                          className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                          value={editForm.phone}
+                          onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
+                        />
+                      </div>
+                     
+                    </div>
+                    <div className="flex justify-end gap-3 mt-6">
+                      <button
+                        onClick={() => setSelectedEditUser(null)}
+                        className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={updateUser}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                      >
+                        Save Changes
+                      </button>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Pagination */}
+            <div className="flex items-center justify-between mt-6">
+              <div className="text-sm text-gray-700">
+                Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{" "}
+                <span className="font-medium">
+                  {Math.min(indexOfLastItem, filteredUsers.length)}
+                </span>{" "}
+                of <span className="font-medium">{filteredUsers.length}</span> results
+              </div>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => paginate(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className={`px-3 py-1 rounded-md ${currentPage === 1 ? "bg-gray-200 text-gray-500 cursor-not-allowed" : "bg-blue-600 text-white hover:bg-blue-700"}`}
+                >
+                  Previous
+                </button>
+                {[...Array(Math.ceil(filteredUsers.length / itemsPerPage)).keys()].map((num) => (
+                  <button
+                    key={num + 1}
+                    onClick={() => paginate(num + 1)}
+                    className={`px-3 py-1 rounded-md ${currentPage === num + 1 ? "bg-blue-800 text-white" : "bg-white text-blue-600 hover:bg-gray-100"}`}
+                  >
+                    {num + 1}
+                  </button>
+                ))}
+                <button
+                  onClick={() => paginate(currentPage + 1)}
+                  disabled={indexOfLastItem >= filteredUsers.length}
+                  className={`px-3 py-1 rounded-md ${indexOfLastItem >= filteredUsers.length ? "bg-gray-200 text-gray-500 cursor-not-allowed" : "bg-blue-600 text-white hover:bg-blue-700"}`}
+                >
+                  Next
                 </button>
               </div>
             </div>
-            
-            <div className="p-4">
-              <div className="relative mb-4">
-                <input
-                  type="text"
-                  placeholder="Search available guards..."
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-                  value={searchAvailable}
-                  onChange={(e) => setSearchAvailable(e.target.value)}
-                />
-                <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
-              </div>
-              
-              <div className="max-h-64 overflow-y-auto">
-                {filteredAvailableGuards.length > 0 ? (
-                  filteredAvailableGuards.map((guard) => (
-                    <div 
-                      key={guard.id}
-                      className={`p-3 border-b border-gray-200 hover:bg-gray-50 cursor-pointer ${
-                        selectedGuard?.id === guard.id ? 'bg-gray-100' : ''
-                      }`}
-                      onClick={() => setSelectedGuard(guard)}
-                    >
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <h4 className="text-md font-medium">{guard.name}</h4>
-                          <p className="text-sm text-gray-500">Badge: {guard.badge}</p>
-                        </div>
-                        <div>
-                          <span className="text-sm mr-2">{guard.shift} Shift</span>
-                          {selectedGuard?.id === guard.id && (
-                            <span className="text-secondary">
-                              <Check size={18} />
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="py-4 text-center text-gray-500">
-                    No available guards found
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            <div className="p-4 border-t border-gray-200 flex justify-end space-x-2">
-              <button 
-                onClick={() => setShowAssignModal(false)}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition duration-200"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={() => selectedGuard && handleAssignGuard(selectedGuard)}
-                className={`px-4 py-2 bg-secondary text-white rounded-md transition duration-200 ${
-                  selectedGuard ? 'hover:bg-secondary-dark' : 'opacity-50 cursor-not-allowed'
-                }`}
-                disabled={!selectedGuard}
-              >
-                Assign Guard
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </motion.div>
     </div>
   );
 };
 
-export default ManageGuardsPage;
+export default ManageSecurityPage;

@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { 
   AlertCircle, 
   Calendar, 
@@ -7,10 +8,13 @@ import {
   UserCheck, 
   Car,
   Clock,
-  ArrowUpRight
+  ArrowUpRight,
+  Loader2
 } from 'lucide-react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement } from 'chart.js';
 import { Pie, Bar } from 'react-chartjs-2';
+import axios from 'axios';
+import { toast } from 'react-toastify';
 
 // Register ChartJS components
 ChartJS.register(
@@ -23,20 +27,36 @@ ChartJS.register(
 );
 
 const Dashboard = () => {
-  // Sample data
-  const stats = [
-    { title: "Total Alerts", value: "24", icon: <AlertCircle className="text-secondary" />, change: "+2 today" },
-    { title: "Upcoming Events", value: "5", icon: <Calendar className="text-primary-light" />, change: "1 new" },
-    { title: "Active Staff", value: "18", icon: <Users className="text-secondary-dark" />, change: "2 on leave" },
-    { title: "Pending Approvals", value: "7", icon: <UserCheck className="text-primary" />, change: "3 new" }
-  ];
-
-  const recentActivities = [
-    { id: 1, action: "New visitor registered", time: "10 mins ago", user: "Flat 201" },
-    { id: 2, action: "Security alert resolved", time: "25 mins ago", user: "Guard Rajesh" },
-    { id: 3, action: "Event created", time: "1 hour ago", user: "Admin" },
-    { id: 4, action: "New staff added", time: "2 hours ago", user: "HR Manager" }
-  ];
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState([
+    { title: "Total Alerts", value: "0", icon: <AlertCircle className="text-secondary" />, change: "+0 today" },
+    { title: "Upcoming Events", value: "0", icon: <Calendar className="text-primary-light" />, change: "0 new" },
+    { title: "Active Staff", value: "0", icon: <Users className="text-secondary-dark" />, change: "0 on leave" },
+    { title: "Pending Approvals", value: "0", icon: <UserCheck className="text-primary" />, change: "0 new" }
+  ]);
+  const [recentActivities, setRecentActivities] = useState([]);
+  const [approvalRequests, setApprovalRequests] = useState([]);
+  const [visitorData, setVisitorData] = useState({
+    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    datasets: [
+      {
+        label: 'Visitors',
+        data: [0, 0, 0, 0, 0, 0, 0],
+        backgroundColor: '#3498DB',
+        borderRadius: 4,
+      }
+    ]
+  });
+  const [alertData, setAlertData] = useState({
+    labels: ['Resolved', 'Pending', 'Critical'],
+    datasets: [
+      {
+        data: [0, 0, 0],
+        backgroundColor: ['#2ecc71', '#f39c12', '#e74c3c'],
+        borderWidth: 0,
+      }
+    ]
+  });
 
   const quickLinks = [
     { title: "Manage Alerts", icon: <AlertCircle size={20} />, link: "/admin/alerts" },
@@ -44,31 +64,6 @@ const Dashboard = () => {
     { title: "Add Staff", icon: <Users size={20} />, link: "/admin/staff" },
     { title: "View Reports", icon: <Activity size={20} />, link: "/admin/reports" }
   ];
-
-  // Visitor data for bar chart
-  const visitorData = {
-    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-    datasets: [
-      {
-        label: 'Visitors',
-        data: [12, 19, 8, 15, 12, 18, 10],
-        backgroundColor: '#3498DB',
-        borderRadius: 4,
-      }
-    ]
-  };
-
-  // Alert data for pie chart
-  const alertData = {
-    labels: ['Resolved', 'Pending', 'Critical'],
-    datasets: [
-      {
-        data: [5, 3, 2],
-        backgroundColor: ['#2ecc71', '#f39c12', '#e74c3c'],
-        borderWidth: 0,
-      }
-    ]
-  };
 
   // Chart options
   const barOptions = {
@@ -101,6 +96,224 @@ const Dashboard = () => {
       }
     }
   };
+
+  const extractData = (response) => {
+    if (!response || !response.data) return [];
+    
+    // Handle different possible response structures
+    if (Array.isArray(response.data)) {
+      return response.data;
+    }
+    if (response.data.data && Array.isArray(response.data.data)) {
+      return response.data.data;
+    }
+    if (response.data.events && Array.isArray(response.data.events)) {
+      return response.data.events;
+    }
+    if (response.data.users && Array.isArray(response.data.users)) {
+      return response.data.users;
+    }
+    return [];
+  };
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        const token = localStorage.getItem('token');
+        
+        if (!token) {
+          throw new Error('No authentication token found');
+        }
+
+        // Fetch all data in parallel
+        const [
+          alertsRes, 
+          eventsRes, 
+          usersRes, 
+          approvalsRes,
+          vehiclesRes
+        ] = await Promise.all([
+          axios.get('http://localhost:5000/api/emergency/all-emergency-alerts', { 
+            headers: { Authorization: `Bearer ${token}` } 
+          }),
+          axios.get('http://localhost:5000/api/event/view-event', { 
+            headers: { Authorization: `Bearer ${token}` } 
+          }),
+          axios.get('http://localhost:5000/api/admin/users', { 
+            headers: { Authorization: `Bearer ${token}` } 
+          }),
+          axios.get('http://localhost:5000/api/admin/users?status=pending', { 
+            headers: { Authorization: `Bearer ${token}` } 
+          }),
+          axios.get('http://localhost:5000/api/vehicle/admin/all', { 
+            headers: { Authorization: `Bearer ${token}` } 
+          })
+        ]);
+
+        // Log responses for debugging
+        console.log('API Responses:', {
+          alerts: alertsRes.data,
+          events: eventsRes.data,
+          users: usersRes.data,
+          approvals: approvalsRes.data,
+          vehicles: vehiclesRes.data
+        });
+
+        // Extract data from responses
+        const alerts = extractData(alertsRes);
+        const events = extractData(eventsRes);
+        const users = extractData(usersRes);
+        const approvals = extractData(approvalsRes);
+        const vehicles = extractData(vehiclesRes);
+
+        // Process alerts data
+        const totalAlerts = alerts.length;
+        const resolvedAlerts = alerts.filter(a => a?.status === 'resolved').length;
+        const pendingAlerts = alerts.filter(a => a?.status === 'pending').length;
+        const criticalAlerts = alerts.filter(a => a?.priority === 'high').length;
+
+        // Process events data
+        const upcomingEvents = events.filter(
+          e => e?.date && new Date(e.date) >= new Date()
+        ).length;
+
+        // Process users data
+        const activeStaff = users.filter(
+          u => u?.role === 'staff' && u?.status === 'active'
+        ).length;
+        const onLeaveStaff = users.filter(
+          u => u?.role === 'staff' && u?.status === 'on_leave'
+        ).length;
+
+        // Process approval requests
+        const pendingApprovals = approvals.length;
+
+        // Process vehicle data for visitor chart
+        const vehicleEntries = vehicles.reduce((acc, vehicle) => {
+          if (vehicle?.createdAt) {
+            const day = new Date(vehicle.createdAt).getDay();
+            acc[day] = (acc[day] || 0) + 1;
+          }
+          return acc;
+        }, {});
+
+        const visitorChartData = [0, 0, 0, 0, 0, 0, 0];
+        Object.entries(vehicleEntries).forEach(([day, count]) => {
+          visitorChartData[parseInt(day)] = count;
+        });
+
+        // Update state
+        setStats([
+          { 
+            title: "Total Alerts", 
+            value: totalAlerts.toString(), 
+            icon: <AlertCircle className="text-secondary" />, 
+            change: `+${alerts.filter(a => 
+              a?.createdAt && new Date(a.createdAt).toDateString() === new Date().toDateString()
+            ).length} today` 
+          },
+          { 
+            title: "Upcoming Events", 
+            value: upcomingEvents.toString(), 
+            icon: <Calendar className="text-primary-light" />, 
+            change: `${events.filter(e => 
+              e?.createdAt && new Date(e.createdAt).toDateString() === new Date().toDateString()
+            ).length} new` 
+          },
+          { 
+            title: "Active Staff", 
+            value: activeStaff.toString(), 
+            icon: <Users className="text-secondary-dark" />, 
+            change: `${onLeaveStaff} on leave` 
+          },
+          { 
+            title: "Pending Approvals", 
+            value: pendingApprovals.toString(), 
+            icon: <UserCheck className="text-primary" />, 
+            change: `${approvals.filter(a => 
+              a?.createdAt && new Date(a.createdAt).toDateString() === new Date().toDateString()
+            ).length} new` 
+          }
+        ]);
+
+        // Create recent activities from approvals and alerts
+        const activityData = [
+          ...approvals.slice(0, 2).map(approval => ({
+            id: approval._id,
+            action: `New ${approval.role} registration`,
+            time: approval.createdAt ? new Date(approval.createdAt).toLocaleTimeString() : 'Recently',
+            user: approval.name || 'New user'
+          })),
+          ...alerts.slice(0, 2).map(alert => ({
+            id: alert._id,
+            action: `Security alert: ${alert.type}`,
+            time: alert.createdAt ? new Date(alert.createdAt).toLocaleTimeString() : 'Recently',
+            user: 'Security System'
+          }))
+        ];
+        setRecentActivities(activityData.slice(0, 4));
+
+        setApprovalRequests(approvals.slice(0, 2));
+        setVisitorData({
+          ...visitorData,
+          datasets: [{
+            ...visitorData.datasets[0],
+            data: visitorChartData
+          }]
+        });
+        setAlertData({
+          ...alertData,
+          datasets: [{
+            ...alertData.datasets[0],
+            data: [resolvedAlerts, pendingAlerts, criticalAlerts]
+          }]
+        });
+
+      } catch (error) {
+        console.error('Dashboard error:', {
+          error: error,
+          response: error.response?.data
+        });
+        toast.error('Failed to load dashboard data. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
+
+  const handleApproval = async (userId, action) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await axios.put(
+        `http://localhost:5000/api/admin/${action === 'approve' ? 'approve' : 'reject'}/${userId}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      console.log(`${action} response:`, response.data);
+      
+      setApprovalRequests(prev => prev.filter(req => req._id !== userId));
+      toast.success(`User ${action}d successfully`);
+    } catch (error) {
+      console.error(`${action} error:`, error.response?.data || error.message);
+      toast.error(`Failed to ${action} user. Please try again.`);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="animate-spin h-12 w-12 text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 bg-background min-h-screen">
@@ -141,10 +354,10 @@ const Dashboard = () => {
           {/* Visitors Chart */}
           <div className="bg-white rounded-xl shadow-lg p-6 transform transition-all hover:shadow-xl">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-primary-dark">Daily Visitor Entries</h2>
-              <button className="text-xs text-secondary flex items-center">
+              <h2 className="text-lg font-semibold text-primary-dark">Weekly Vehicle Entries</h2>
+              <a href="/admin/vehicles" className="text-xs text-secondary flex items-center">
                 View all <ArrowUpRight size={14} className="ml-1" />
-              </button>
+              </a>
             </div>
             <div className="h-64">
               <Bar data={visitorData} options={barOptions} />
@@ -155,9 +368,9 @@ const Dashboard = () => {
           <div className="bg-white rounded-xl shadow-lg p-6 transform transition-all hover:shadow-xl">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold text-primary-dark">Security Alerts</h2>
-              <button className="text-xs text-secondary flex items-center">
+              <a href="/admin/alerts" className="text-xs text-secondary flex items-center">
                 View all <ArrowUpRight size={14} className="ml-1" />
-              </button>
+              </a>
             </div>
             <div className="h-64">
               <Pie data={alertData} options={pieOptions} />
@@ -182,6 +395,9 @@ const Dashboard = () => {
                   </div>
                 </div>
               ))}
+              {recentActivities.length === 0 && (
+                <p className="text-sm text-gray-500 text-center py-2">No recent activities</p>
+              )}
             </div>
           </div>
 
@@ -206,24 +422,37 @@ const Dashboard = () => {
 
           {/* Approval Requests */}
           <div className="bg-white rounded-xl shadow-lg p-6 transform transition-all hover:shadow-xl">
-            <h2 className="text-lg font-semibold text-primary-dark mb-4">Approval Requests (3)</h2>
+            <h2 className="text-lg font-semibold text-primary-dark mb-4">
+              Approval Requests ({approvalRequests.length})
+            </h2>
             <div className="space-y-3">
-              <div className="p-3 bg-yellow-50 rounded-lg">
-                <p className="text-sm font-medium text-primary-dark">New Resident Registration</p>
-                <p className="text-xs text-gray-500 mb-2">Flat 305 • Waiting 2 days</p>
-                <div className="flex space-x-2">
-                  <button className="text-xs bg-secondary text-white px-3 py-1 rounded">Approve</button>
-                  <button className="text-xs bg-red-100 text-red-600 px-3 py-1 rounded">Reject</button>
+              {approvalRequests.map(request => (
+                <div key={request._id} className="p-3 bg-yellow-50 rounded-lg">
+                  <p className="text-sm font-medium text-primary-dark">
+                    {request.role === 'resident' ? 'New Resident Registration' : 'New Staff Registration'}
+                  </p>
+                  <p className="text-xs text-gray-500 mb-2">
+                    {request.name || 'Unknown'} • {request.createdAt ? new Date(request.createdAt).toLocaleDateString() : 'Pending'}
+                  </p>
+                  <div className="flex space-x-2">
+                    <button 
+                      onClick={() => handleApproval(request._id, 'approve')}
+                      className="text-xs bg-secondary text-white px-3 py-1 rounded hover:bg-secondary-dark transition-colors"
+                    >
+                      Approve
+                    </button>
+                    <button 
+                      onClick={() => handleApproval(request._id, 'reject')}
+                      className="text-xs bg-red-100 text-red-600 px-3 py-1 rounded hover:bg-red-200 transition-colors"
+                    >
+                      Reject
+                    </button>
+                  </div>
                 </div>
-              </div>
-              <div className="p-3 bg-yellow-50 rounded-lg">
-                <p className="text-sm font-medium text-primary-dark">Vehicle Entry Request</p>
-                <p className="text-xs text-gray-500 mb-2">Flat 102 • Today</p>
-                <div className="flex space-x-2">
-                  <button className="text-xs bg-secondary text-white px-3 py-1 rounded">Approve</button>
-                  <button className="text-xs bg-red-100 text-red-600 px-3 py-1 rounded">Reject</button>
-                </div>
-              </div>
+              ))}
+              {approvalRequests.length === 0 && (
+                <p className="text-sm text-gray-500 text-center py-2">No pending approvals</p>
+              )}
             </div>
           </div>
         </div>

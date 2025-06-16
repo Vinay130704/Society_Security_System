@@ -25,11 +25,11 @@ const AdminLayout = () => {
   const navItems = [
     { name: "Dashboard", icon: Home, path: "/admin/admin-dashboard" },
     { name: "User Management", icon: Users, path: "/admin/user-management" },
+    { name: "Manage Residents", icon: UserCog, path: "/admin/manage-residents" },
+    { name: "Manage Guards", icon: HardHat, path: "/admin/manage-guards" },
     { name: "Resident Logs", icon: ClipboardList, path: "/admin/resident-logs" },
-    { name: "Delivery Logs", icon: Truck, path: "/admin/delivery-logs" },
     { name: "Emergency", icon: AlertTriangle, path: "/admin/emergency-view" },
-    { name: "Events", icon: CalendarRange, path: "/admin/events" },
-    { name: "Workers", icon: HardHat, path: "/admin/workers" },
+    { name: "Events", icon: CalendarRange, path: "/admin/event-add" },
     { name: "Vehicle", icon: Truck, path: "/admin/vehicle" }
   ];
 

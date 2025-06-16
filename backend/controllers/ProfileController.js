@@ -355,7 +355,7 @@ exports.removeFamilyMember = async (req, res) => {
   }
 };
 
-// Entry/Exit logs
+// Enhanced Entry/Exit logs controller with PID suggestions
 exports.recordEntryExit = async (req, res) => {
   try {
     const { permanentId, type, method } = req.body;
@@ -368,13 +368,21 @@ exports.recordEntryExit = async (req, res) => {
     }
 
     let user, personName, isFamilyMember = false;
+    
+    // First try to find by resident PID
     user = await User.findOne({ permanentId });
     
     if (!user) {
-      // Check if permanentId belongs to a family member
+      // If not found as resident, check family members
       user = await User.findOne({ "familyMembers.permanentId": permanentId });
       if (user) {
         const familyMember = user.familyMembers.find(m => m.permanentId === permanentId);
+        if (!familyMember) {
+          return res.status(404).json({
+            success: false,
+            message: "Family member not found"
+          });
+        }
         personName = familyMember.name;
         isFamilyMember = true;
       } else {
@@ -420,6 +428,67 @@ exports.recordEntryExit = async (req, res) => {
   }
 };
 
+// New endpoint for PID suggestions
+exports.getPidSuggestions = async (req, res) => {
+  try {
+    const { query } = req.query;
+    
+    if (!query || query.length < 2) {
+      return res.status(200).json({
+        success: true,
+        suggestions: []
+      });
+    }
+
+    // Find matching residents
+    const residents = await User.find({
+      role: "resident",
+      $or: [
+        { permanentId: { $regex: query, $options: 'i' } },
+        { name: { $regex: query, $options: 'i' } }
+      ]
+    }).select('permanentId name flat_no familyMembers').lean();
+
+    // Process results
+    const suggestions = residents.flatMap(resident => {
+      const residentEntry = {
+        permanentId: resident.permanentId,
+        name: resident.name,
+        flatNo: resident.flat_no,
+        isFamilyMember: false,
+        relation: 'Primary Resident'
+      };
+      
+      const familyMembers = resident.familyMembers
+        .filter(member => 
+          member.permanentId.includes(query) || 
+          member.name.toLowerCase().includes(query.toLowerCase())
+        )
+        .map(member => ({
+          permanentId: member.permanentId,
+          name: member.name,
+          flatNo: resident.flat_no,
+          isFamilyMember: true,
+          relation: member.relation || 'Family Member'
+        }));
+      
+      return [residentEntry, ...familyMembers];
+    });
+
+    res.status(200).json({
+      success: true,
+      suggestions: suggestions.slice(0, 10) // Limit to 10 suggestions
+    });
+  } catch (error) {
+    console.error("PID suggestions error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch PID suggestions",
+      error: error.message
+    });
+  }
+};
+
 exports.getResidentLogs = async (req, res) => {
   try {
     const { permanentId } = req.params;
@@ -453,6 +522,47 @@ exports.getResidentLogs = async (req, res) => {
     });
   } catch (error) {
     console.error("Get resident logs error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch logs",
+      error: error.message
+    });
+  }
+};
+
+
+// Get all resident logs with optional filters
+exports.getResidentLogs = async (req, res) => {
+  try {
+    const { type, startDate, endDate, limit = 50 } = req.query;
+
+    const query = {};
+    if (type) query.type = type;
+    if (startDate || endDate) {
+      query.timestamp = {};
+      if (startDate) query.timestamp.$gte = new Date(startDate);
+      if (endDate) query.timestamp.$lte = new Date(endDate);
+    }
+
+    const logs = await EntryLog.find(query)
+      .populate("user", "name flat_no profilePicture")
+      .populate("verifiedBy", "name role")
+      .sort({ timestamp: -1 })
+      .limit(parseInt(limit))
+      .lean();
+
+    logs.forEach(log => {
+      if (log.user?.profilePicture) {
+        log.user.profilePicture = log.user.profilePicture.replace(/\\/g, "/");
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      logs
+    });
+  } catch (error) {
+    console.error("Get all resident logs error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to fetch logs",
