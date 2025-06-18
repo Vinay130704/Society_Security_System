@@ -19,7 +19,7 @@ const errorHandler = require("./middleware/errorHandler");
 // Route imports
 const staffRoutes = require("./routes/Staff-Routes");
 const authRoutes = require("./routes/Auth-Routes");
-const visitorRoutes = require("./routes/Visitor-Routers");
+const visitorRoutes = require("./routes/visitor-Routers");
 const adminRoutes = require("./routes/Admin-Routes");
 const vehicleRoutes = require("./routes/Vehicle-Routes");
 const deliveryRoutes = require("./routes/Delivery-Routes");
