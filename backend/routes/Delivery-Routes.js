@@ -2,19 +2,21 @@ const express = require("express");
 const router = express.Router();
 const {
   createDeliveryRequest,
-  scanUniqueId, // Updated function name
+  scanUniqueId,
   editDeliveryDetails,
   deleteDeliveryRequest,
   getAllDeliveryRequests,
+  getDeliveryLogs
 } = require("../controllers/DeliveryController"); 
 
 const { authMiddleware } = require("../middleware/authMiddleware");
 
-// Routes with access comments
-router.post("/create", authMiddleware, createDeliveryRequest); // Restricted to residents only
-router.post("/scan", authMiddleware, scanUniqueId); // Restricted to security guards only
-router.put("/edit/:deliveryId", authMiddleware, editDeliveryDetails); // Restricted to residents only
-router.delete("/delete/:deliveryId", authMiddleware, deleteDeliveryRequest); // Restricted to residents only
-router.get("/all", authMiddleware, getAllDeliveryRequests); // Accessible to authenticated users (role-based logic handled in controller)
+// Routes
+router.post("/create", authMiddleware, createDeliveryRequest);
+router.post("/scan", authMiddleware, scanUniqueId);
+router.put("/edit/:deliveryId", authMiddleware, editDeliveryDetails);
+router.delete("/delete/:deliveryId", authMiddleware, deleteDeliveryRequest);
+router.get("/all", authMiddleware, getAllDeliveryRequests);
+router.get("/logs/:deliveryId", authMiddleware, getDeliveryLogs); // New route for logs
 
 module.exports = router;

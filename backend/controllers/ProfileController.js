@@ -199,6 +199,10 @@ exports.updateProfilePicture = async (req, res) => {
 // Family member management
 exports.addFamilyMember = async (req, res) => {
   try {
+    const { name, relation, gender } = req.body;
+    const userId = req.user.userId;
+
+    // Authorization check
     if (req.user.role !== "resident") {
       return res.status(403).json({
         success: false,
@@ -206,7 +210,7 @@ exports.addFamilyMember = async (req, res) => {
       });
     }
 
-    const { name, relation, gender } = req.body;
+    // Validation
     if (!name || !relation) {
       return res.status(400).json({
         success: false,
@@ -214,7 +218,8 @@ exports.addFamilyMember = async (req, res) => {
       });
     }
 
-    const user = await User.findById(req.user.userId);
+    // Check if user exists
+    const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -222,35 +227,54 @@ exports.addFamilyMember = async (req, res) => {
       });
     }
 
-    const familyMember = {
+    // Prepare new member data
+    const newMember = {
       name,
       relation,
       gender: gender || "-",
-      permanentId: `PID${Date.now()}${Math.floor(Math.random() * 1000)}`
+      permanentId: `PID${Date.now()}${Math.floor(Math.random() * 1000)}`,
+      profilePicture: req.file ? req.file.path.replace(/\\/g, "/") : undefined
     };
-    user.familyMembers.push(familyMember);
-    await user.save();
+
+    // Add member using atomic update
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { $push: { familyMembers: newMember } },
+      { new: true, runValidators: true }
+    ).select("-password -__v");
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found after update"
+      });
+    }
+
+    // Get the newly added member (last in array)
+    const addedMember = updatedUser.familyMembers.slice(-1)[0];
 
     res.status(201).json({
       success: true,
-      message: "Family member added",
-      familyMember: user.familyMembers[user.familyMembers.length - 1]
+      message: "Family member added successfully",
+      familyMember: addedMember,
+      familyMembers: updatedUser.familyMembers
     });
+
   } catch (error) {
     console.error("Add family member error:", error);
-    res.status(500).json({
+    res.status(400).json({
       success: false,
-      message: "Failed to add family member",
-      error: error.message
+      message: "Add family member failed",
+      error: error.message.includes("validation") ? "Invalid data provided" : error.message
     });
   }
 };
-
 // Update Family Member - Fixed Version
 exports.updateFamilyMember = async (req, res) => {
   try {
     const { memberId, name, relation, gender } = req.body;
-    
+    const userId = req.user.userId;
+
     if (!memberId) {
       return res.status(400).json({
         success: false,
@@ -258,50 +282,66 @@ exports.updateFamilyMember = async (req, res) => {
       });
     }
 
-    const user = await User.findById(req.user.userId);
+    const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: "User not found" 
+        message: "User not found"
       });
     }
 
-    const memberIndex = user.familyMembers.findIndex(
-      m => m._id.toString() === memberId
-    );
-    
-    if (memberIndex === -1) {
+    const member = user.familyMembers.id(memberId);
+    if (!member) {
       return res.status(404).json({
         success: false,
         message: "Family member not found"
       });
     }
 
-    // Update fields
-    if (name) user.familyMembers[memberIndex].name = name;
-    if (relation) user.familyMembers[memberIndex].relation = relation;
-    if (gender) user.familyMembers[memberIndex].gender = gender;
+    // Create updates object similar to updateProfile
+    const updates = {};
+    if (name) updates["familyMembers.$[elem].name"] = name;
+    if (relation) updates["familyMembers.$[elem].relation"] = relation;
+    if (gender) updates["familyMembers.$[elem].gender"] = gender;
     
     // Handle file upload if provided
     if (req.file) {
-      user.familyMembers[memberIndex].profilePicture = 
-        req.file.path.replace(/\\/g, "/");
+      updates["familyMembers.$[elem].profilePicture"] = req.file.path.replace(/\\/g, "/");
     }
 
-    await user.save();
+    // Use findByIdAndUpdate with arrayFilters for atomic update
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      updates,
+      {
+        new: true,
+        runValidators: true,
+        arrayFilters: [{ "elem._id": memberId }]
+      }
+    ).select("-password -__v");
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found after update"
+      });
+    }
+
+    // Find the updated member in the returned document
+    const updatedMember = updatedUser.familyMembers.id(memberId);
 
     res.status(200).json({
       success: true,
       message: "Family member updated successfully",
-      updatedMember: user.familyMembers[memberIndex],
-      familyMembers: user.familyMembers
+      updatedMember: updatedMember,
+      familyMembers: updatedUser.familyMembers
     });
   } catch (error) {
     console.error("Update family member error:", error);
-    res.status(500).json({
+    res.status(400).json({
       success: false,
-      message: "Failed to update family member",
-      error: error.message
+      message: "Update failed",
+      error: error.message.includes("validation") ? "Invalid data provided" : error.message
     });
   }
 };
@@ -406,7 +446,7 @@ exports.recordEntryExit = async (req, res) => {
       user: user._id,
       permanentId,
       type,
-      method: method || "manual",
+      method,
       verifiedBy: req.user.userId,
       personName,
       flatNo: user.flat_no,

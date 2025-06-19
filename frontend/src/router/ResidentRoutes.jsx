@@ -10,6 +10,7 @@ import EmergencyAlert from "../pages/Resident/Emergency";
 import ResidentEvents from "../pages/Resident/Events";
 import ResidentStaff from "../pages/Resident/ResidentStaff";
 import ResidentVehicle from "../pages/Resident/ResidentVechile";
+import ResidentLogs from "../pages/Resident/ResidentLogs";
 
 const ResidentRoutes = () => {
   return (
@@ -23,6 +24,7 @@ const ResidentRoutes = () => {
         <Route path="resident-events" element={<ResidentEvents />} />
         <Route path="resident-staff" element={<ResidentStaff />} />
         <Route path="resident-vehicle" element={<ResidentVehicle />} />
+        <Route path="resident-logs" element={<ResidentLogs />} />
       </Route>
     </Routes>
   );

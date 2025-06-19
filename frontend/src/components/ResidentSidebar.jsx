@@ -21,14 +21,15 @@ const ResidentLayout = () => {
   };
 
   const navItems = [
-    { name: "Dashboard", icon: Home, path: "/resident/resident-dashboard" },
+    // { name: "Dashboard", icon: Home, path: "/resident/resident-dashboard" },
+    { name: "Profile", icon: User, path: "/resident/resident-profile" },
     { name: "Staff", icon: Bell, path: "/resident/resident-staff" },
     { name: "Vehicles", icon: Car, path: "/resident/resident-vehicle" },
     { name: "Visitors", icon: User, path: "/resident/resident-visitor" },
     { name: "Deliveries", icon: Truck, path: "/resident/resident-delivery" },
     { name: "Events", icon: CalendarRange, path: "/resident/resident-events" },
+    { name: "Logs", icon: Bell, path: "/resident/resident-logs" },
     { name: "Emergency", icon: AlertTriangle, path: "/resident/resident-emergency" },
-    { name: "Profile", icon: User, path: "/resident/resident-profile" },
   ];
 
   const handleLogout = () => {
@@ -64,7 +65,7 @@ const ResidentLayout = () => {
                   <li key={item.name}>
                     <NavLink
                       to={item.path}
-                      className={({ isActive }) => 
+                      className={({ isActive }) =>
                         `flex items-center p-3 rounded-lg transition-colors 
                         ${isActive
                           ? "bg-secondary text-white"
@@ -94,7 +95,7 @@ const ResidentLayout = () => {
         </aside>
 
         {/* Main Content Area */}
-        <main 
+        <main
           className={`flex-1 bg-background ${isOpen ? "ml-64" : "ml-20"} transition-all duration-300 pt-16 min-h-[calc(100vh-64px)]`}
         >
           <Outlet />

@@ -4,27 +4,17 @@ import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import axios from 'axios';
 import {
-  Truck, Package, Clock, Check, X,
-  Calendar, Search, Home, User,
-  ArrowRightCircle, Plus, Edit, Trash2,
-  ChevronLeft, ChevronRight
+  Truck, Package, Clock, X, Calendar, Search, Home, User,
+  ArrowRightCircle, Plus, Edit, Trash2, ChevronLeft, ChevronRight, List
 } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 
 const DELIVERY_COMPANIES = [
-  'Amazon',
-  'Flipkart',
-  'DHL',
-  'FedEx',
-  'Blue Dart',
-  'DTDC',
-  'Swiggy Instamart',
-  'Zomato',
-  'Other'
+  'Amazon', 'Flipkart', 'DHL', 'FedEx', 'Blue Dart',
+  'DTDC', 'Swiggy Instamart', 'Zomato', 'Other'
 ];
 
-// Custom Phone Input Component
 const PhoneInput = ({ value, onChange, error }) => {
   const [digits, setDigits] = useState(value.replace(/^\+91/, '') || '');
 
@@ -46,7 +36,9 @@ const PhoneInput = ({ value, onChange, error }) => {
           type="text"
           value={digits}
           onChange={handleChange}
-          className={`w-full pl-12 pr-4 py-2 border ${error ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition`}
+          className={`w-full pl-12 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
+            error ? 'border-red-500' : 'border-gray-300'
+          }`}
           placeholder="Enter 10-digit number"
           required
           pattern="[0-9]{10}"
@@ -57,17 +49,58 @@ const PhoneInput = ({ value, onChange, error }) => {
   );
 };
 
+const DeliveryLogs = ({ logs }) => {
+  return (
+    <div className="mt-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
+      <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+        <List size={18} /> Delivery Activity Log
+      </h3>
+      <div className="space-y-3">
+        {logs.length === 0 ? (
+          <p className="text-gray-500">No activity recorded yet</p>
+        ) : (
+          <div className="border-l-2 border-blue-200 pl-4 space-y-4">
+            {logs.map((log, index) => (
+              <div key={index} className="relative">
+                <div className="absolute -left-4 top-2 h-3 w-3 rounded-full "></div>
+                <div className="ml-2">
+                  <div className="flex justify-between">
+                    <span className="font-medium capitalize">{log.action}</span>
+                    <span className="text-sm text-gray-500">
+                      {new Date(log.time).toLocaleString('en-IN', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-1">{log.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const DeliveryManagement = () => {
   const [activeTab, setActiveTab] = useState('active');
   const [deliveries, setDeliveries] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDate, setSelectedDate] = useState(null);
-  const [uniqueIdData, setUniqueIdData] = useState(null);
-  const [residentData, setResidentData] = useState(null);
+  const [currentDelivery, setCurrentDelivery] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(5);
   const [phoneError, setPhoneError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [logs, setLogs] = useState([]);
+  const [resident, setResident] = useState(null);
   const navigate = useNavigate();
 
   const [deliveryForm, setDeliveryForm] = useState({
@@ -78,50 +111,70 @@ const DeliveryManagement = () => {
     expectedTime: new Date()
   });
 
-  const API_BASE_URL = 'http://localhost:5000/api';
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
   const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
     if (!token) {
-      toast.error('Please login to continue');
+      toast.error('Please login to continue', { position: 'top-right', autoClose: 5000 });
       navigate('/login');
-      return {};
+      return null;
     }
     return {
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json'
       }
     };
   };
 
   const fetchResidentData = async () => {
+    setIsLoading(true);
     try {
-      const response = await axios.get(`${API_BASE_URL}/profile/get-profile`, getAuthHeaders());
-      const resident = response.data.user || response.data.data || response.data;
-      if (!resident._id || !resident.flat_no) {
+      const headers = getAuthHeaders();
+      if (!headers) return null;
+
+      const response = await axios.get(`${API_BASE_URL}/profile/get-profile`, headers);
+      const residentData = response.data.data || response.data.user || response.data;
+      if (!residentData._id || !residentData.flat_no) {
         throw new Error('Resident data missing _id or flat_no');
       }
-      setResidentData(resident);
+      setResident(residentData);
       setDeliveryForm(prev => ({
         ...prev,
-        apartment: resident.flat_no
+        apartment: residentData.flat_no
       }));
+      return residentData;
     } catch (error) {
       console.error('Error fetching resident data:', error);
-      toast.error(error.message || 'Failed to load resident information');
-      navigate('/login');
+      toast.error(error.response?.data?.message || 'Failed to load resident information', {
+        position: 'top-right',
+        autoClose: 5000
+      });
+      if (error.response?.status === 401) {
+        localStorage.removeItem('token');
+        navigate('/login');
+      }
+      return null;
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const fetchDeliveries = async () => {
-    if (!residentData) return;
+    setIsLoading(true);
     try {
+      const resident = await fetchResidentData();
+      if (!resident) return;
+
+      const headers = getAuthHeaders();
+      if (!headers) return;
+
       const response = await axios.get(
         `${API_BASE_URL}/delivery/all`,
         {
-          ...getAuthHeaders(),
-          params: { residentId: residentData._id }
+          ...headers,
+          params: { residentId: resident._id }
         }
       );
 
@@ -129,163 +182,224 @@ const DeliveryManagement = () => {
       const validDeliveries = residentDeliveries.filter(delivery =>
         delivery && typeof delivery.status === 'string'
       );
-      console.log('Fetched deliveries:', validDeliveries);
       setDeliveries(validDeliveries);
     } catch (error) {
       console.error('Error fetching deliveries:', error);
-      toast.error(error.response?.data?.message || 'Failed to load deliveries');
+      toast.error(error.response?.data?.message || 'Failed to load deliveries', {
+        position: 'top-right',
+        autoClose: 5000
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const validatePhone = (phone) => {
-    const digits = phone.replace(/^\+91/, '');
-    if (!/^\d{10}$/.test(digits)) {
-      setPhoneError('Phone number must be 10 digits');
-      return false;
+  const fetchDeliveryLogs = async (deliveryId) => {
+    try {
+      const headers = getAuthHeaders();
+      if (!headers) return;
+
+      const response = await axios.get(
+        `${API_BASE_URL}/delivery/logs/${deliveryId}`,
+        headers
+      );
+      setLogs(response.data.logHistory || []);
+    } catch (error) {
+      console.error('Error fetching delivery logs:', error);
+      toast.error(error.response?.data?.message || 'Failed to load delivery logs', {
+        position: 'top-right',
+        autoClose: 5000
+      });
+      setLogs([]);
     }
-    setPhoneError('');
-    return true;
+  };
+
+  const validateForm = () => {
+    const errors = {};
+    if (!deliveryForm.deliveryPersonName.trim()) {
+      errors.name = 'Delivery person name is required';
+    }
+    if (!/^\+91\d{10}$/.test(deliveryForm.phone)) {
+      errors.phone = 'Phone number must be 10 digits';
+    }
+    if (!deliveryForm.deliveryCompany) {
+      errors.company = 'Delivery company is required';
+    }
+    if (!deliveryForm.apartment) {
+      errors.apartment = 'Apartment number is required';
+    }
+    setPhoneError(errors.phone || '');
+    return Object.keys(errors).length === 0;
   };
 
   const handleCreateDelivery = async (e) => {
     e.preventDefault();
-    if (!residentData || !residentData._id) {
-      toast.error('Resident data not loaded');
+    if (!resident || !resident._id) {
+      toast.error('Resident data not loaded', { position: 'top-right', autoClose: 5000 });
       return;
     }
 
-    if (!validatePhone(deliveryForm.phone)) return;
+    if (!validateForm()) {
+      toast.error('Please fix the form errors', { position: 'top-right', autoClose: 5000 });
+      return;
+    }
 
-    const payload = {
-      ...deliveryForm,
-      residentId: residentData._id,
-      expectedTime: deliveryForm.expectedTime.toISOString()
-    };
-
+    const toastId = toast.loading('Creating delivery request...');
+    setIsSending(true);
     try {
-      const response = await toast.promise(
-        axios.post(`${API_BASE_URL}/delivery/create`, payload, getAuthHeaders()),
-        {
-          pending: 'Creating delivery request...',
-          success: 'Delivery request created successfully!',
-          error: {
-            render({ data }) {
-              const errorMessage = data.response?.data?.message ||
-                data.response?.data?.error ||
-                'Failed to create delivery';
-              if (data.response?.data?.error === "A pending delivery request already exists") {
-                return 'You can only have one active delivery at a time';
-              }
-              return errorMessage;
-            }
-          }
-        }
-      );
+      const headers = getAuthHeaders();
+      if (!headers) return;
 
-      setUniqueIdData(response.data.delivery);
+      const payload = {
+        ...deliveryForm,
+        residentId: resident._id,
+        expectedTime: deliveryForm.expectedTime.toISOString()
+      };
+
+      const response = await axios.post(`${API_BASE_URL}/delivery/create`, payload, headers);
+      setCurrentDelivery(response.data.delivery);
       setDeliveryForm({
         deliveryPersonName: '',
         phone: '+91',
-        apartment: residentData.flat_no,
+        apartment: resident.flat_no,
         deliveryCompany: '',
         expectedTime: new Date()
       });
       setShowForm(false);
-      fetchDeliveries();
+      await fetchDeliveries();
+
+      toast.update(toastId, {
+        render: 'Delivery request created successfully!',
+        type: 'success',
+        isLoading: false,
+        autoClose: 3000
+      });
     } catch (error) {
       console.error('Error creating delivery:', error);
+      const errorMessage = error.response?.data?.message ||
+        error.response?.data?.error ||
+        'Failed to create delivery';
+      toast.update(toastId, {
+        render: errorMessage,
+        type: 'error',
+        isLoading: false,
+        autoClose: 5000
+      });
+    } finally {
+      setIsSending(false);
     }
   };
 
   const handleUpdateDelivery = async (e) => {
     e.preventDefault();
-    if (!uniqueIdData || !uniqueIdData._id) return;
+    if (!currentDelivery || !currentDelivery._id) return;
 
-    if (!validatePhone(deliveryForm.phone)) return;
+    if (!validateForm()) {
+      toast.error('Please fix the form errors', { position: 'top-right', autoClose: 5000 });
+      return;
+    }
 
-    const payload = {
-      ...deliveryForm,
-      expectedTime: deliveryForm.expectedTime.toISOString()
-    };
-
+    const toastId = toast.loading('Updating delivery request...');
+    setIsSending(true);
     try {
-      const response = await toast.promise(
-        axios.put(`${API_BASE_URL}/delivery/edit/${uniqueIdData._id}`, payload, getAuthHeaders()),
-        {
-          pending: 'Updating delivery request...',
-          success: 'Delivery updated successfully!',
-          error: {
-            render({ data }) {
-              const errorMessage = data.response?.data?.message ||
-                data.response?.data?.error ||
-                'Failed to update delivery';
-              if (data.response?.data?.error === "Cannot edit: Delivery time has passed") {
-                return 'You can only edit deliveries with future expected times';
-              }
-              return errorMessage;
-            }
-          }
-        }
-      );
+      const headers = getAuthHeaders();
+      if (!headers) return;
 
-      setUniqueIdData(response.data.delivery);
+      const payload = {
+        ...deliveryForm,
+        expectedTime: deliveryForm.expectedTime.toISOString()
+      };
+
+      const response = await axios.put(
+        `${API_BASE_URL}/delivery/edit/${currentDelivery._id}`,
+        payload,
+        headers
+      );
+      setCurrentDelivery(response.data.delivery);
       setDeliveryForm({
         deliveryPersonName: '',
         phone: '+91',
-        apartment: residentData.flat_no,
+        apartment: resident.flat_no,
         deliveryCompany: '',
         expectedTime: new Date()
       });
       setShowForm(false);
-      fetchDeliveries();
+      await fetchDeliveries();
+
+      toast.update(toastId, {
+        render: 'Delivery updated successfully!',
+        type: 'success',
+        isLoading: false,
+        autoClose: 3000
+      });
     } catch (error) {
       console.error('Error updating delivery:', error);
+      const errorMessage = error.response?.data?.message ||
+        error.response?.data?.error ||
+        'Failed to update delivery';
+      toast.update(toastId, {
+        render: errorMessage,
+        type: 'error',
+        isLoading: false,
+        autoClose: 5000
+      });
+    } finally {
+      setIsSending(false);
     }
   };
 
   const handleDeleteDelivery = async (id) => {
-    try {
-      await toast.promise(
-        axios.delete(`${API_BASE_URL}/delivery/delete/${id}`, getAuthHeaders()),
-        {
-          pending: 'Deleting delivery request...',
-          success: 'Delivery deleted successfully!',
-          error: {
-            render({ data }) {
-              const errorMessage = data.response?.data?.message ||
-                data.response?.data?.error ||
-                'Failed to delete delivery';
-              if (data.response?.data?.error === "Cannot delete: Delivery time has passed") {
-                return 'You can only delete deliveries with future expected times';
-              }
-              return errorMessage;
-            }
-          }
-        }
-      );
+    if (!window.confirm('Are you sure you want to delete this delivery request?')) return;
 
-      if (uniqueIdData && uniqueIdData._id === id) {
-        setUniqueIdData(null);
+    const toastId = toast.loading('Deleting delivery request...');
+    setIsSending(true);
+    try {
+      const headers = getAuthHeaders();
+      if (!headers) return;
+
+      await axios.delete(`${API_BASE_URL}/delivery/delete/${id}`, headers);
+      if (currentDelivery && currentDelivery._id === id) {
+        setCurrentDelivery(null);
+        setLogs([]);
       }
-      fetchDeliveries();
+      await fetchDeliveries();
+
+      toast.update(toastId, {
+        render: 'Delivery deleted successfully!',
+        type: 'success',
+        isLoading: false,
+        autoClose: 3000
+      });
     } catch (error) {
       console.error('Error deleting delivery:', error);
+      const errorMessage = error.response?.data?.message ||
+        error.response?.data?.error ||
+        'Failed to delete delivery';
+      toast.update(toastId, {
+        render: errorMessage,
+        type: 'error',
+        isLoading: false,
+        autoClose: 5000
+      });
+    } finally {
+      setIsSending(false);
     }
   };
 
   const filteredDeliveries = deliveries.filter(delivery => {
     if (!delivery || !delivery.status) return false;
-    const matchesSearch = delivery.deliveryPersonName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      delivery.phone.includes(searchTerm) ||
-      delivery.deliveryCompany.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesDate = !selectedDate ||
-      new Date(delivery.expectedTime).toDateString() === selectedDate.toDateString();
+    const matchesSearch =
+      (delivery.deliveryPersonName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+       delivery.phone?.includes(searchTerm) ||
+       delivery.deliveryCompany?.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesDate =
+      !selectedDate ||
+      (delivery.expectedTime &&
+       new Date(delivery.expectedTime).toDateString() === selectedDate.toDateString());
 
-    if (activeTab === 'active') {
-      return matchesSearch && matchesDate && delivery.status !== 'completed';
-    } else {
-      return matchesSearch && matchesDate && delivery.status === 'completed';
-    }
+    return activeTab === 'active'
+      ? matchesSearch && matchesDate && delivery.status !== 'completed'
+      : matchesSearch && matchesDate && delivery.status === 'completed';
   });
 
   const indexOfLastItem = currentPage * itemsPerPage;
@@ -296,21 +410,43 @@ const DeliveryManagement = () => {
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   const formatTime = (timeString) => {
-    if (!timeString) return '-';
-    const date = new Date(timeString);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (!timeString) return 'N/A';
+    try {
+      return new Date(timeString).toLocaleTimeString('en-IN', {
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return 'N/A';
+    }
   };
 
   const formatDateTime = (dateTimeString) => {
-    if (!dateTimeString) return '-';
-    const date = new Date(dateTimeString);
-    return date.toLocaleString([], {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    if (!dateTimeString) return 'N/A';
+    try {
+      return new Date(dateTimeString).toLocaleString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return 'N/A';
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'approved':
+        return 'bg-green-100 text-green-800';
+      case 'completed':
+        return 'bg-blue-100 text-blue-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
   };
 
   const formatStatus = (status) => {
@@ -319,189 +455,276 @@ const DeliveryManagement = () => {
   };
 
   useEffect(() => {
-    fetchResidentData();
+    fetchDeliveries();
   }, []);
 
   useEffect(() => {
-    if (residentData) fetchDeliveries();
-  }, [residentData]);
+    if (currentDelivery?._id) {
+      fetchDeliveryLogs(currentDelivery._id);
+    } else {
+      setLogs([]);
+    }
+  }, [currentDelivery]);
 
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, selectedDate, activeTab]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-4 md:p-8">
+    <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
-        {/* Header Section */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+        {/* Header */}
+        <div className="bg-white rounded-xl shadow-md p-6 mb-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Delivery Management</h1>
               <p className="text-gray-600 mt-1">
-                {residentData ? `Apartment ${residentData.flat_no} • ${residentData.name}` : 'Loading resident information...'}
+                {resident ? `${resident.name} - Flat ${resident.flat_no}` : 'Loading...'}
               </p>
             </div>
             <div className="flex gap-3">
-              <button
-                onClick={() => navigate('/dashboard')}
-                className="flex items-center gap-2 bg-blue-100 hover:bg-blue-200 text-blue-800 px-4 py-2 rounded-lg transition"
-              >
-                <Home size={18} /> Dashboard
-              </button>
+              
             </div>
           </div>
         </div>
 
-        {/* Tabs Navigation */}
-        <div className="bg-white rounded-2xl shadow-lg overflow-hidden mb-6">
+        {/* Main Content */}
+        <div className="bg-white rounded-xl shadow-md overflow-hidden">
+          {/* Tabs */}
           <div className="flex border-b border-gray-200">
             <button
               onClick={() => setActiveTab('active')}
-              className={`flex-1 py-4 px-6 text-center font-medium flex items-center justify-center gap-2 ${activeTab === 'active' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`flex-1 py-4 px-6 text-center font-medium flex items-center justify-center gap-2 ${
+                activeTab === 'active' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'
+              }`}
             >
               <Truck size={18} /> Active Deliveries
             </button>
             <button
               onClick={() => setActiveTab('history')}
-              className={`flex-1 py-4 px-6 text-center font-medium flex items-center justify-center gap-2 ${activeTab === 'history' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`flex-1 py-4 px-6 text-center font-medium flex items-center justify-center gap-2 ${
+                activeTab === 'history' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'
+              }`}
             >
               <Clock size={18} /> Delivery History
             </button>
           </div>
-        </div>
 
-        {/* Main Content */}
-        <div className="bg-white rounded-2xl shadow-lg overflow-hidden p-6">
           {/* Filters and Actions */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-            <h2 className="text-xl font-bold text-gray-800">
-              {activeTab === 'active' ? 'Active Deliveries' : 'Delivery History'}
-              <span className="ml-2 text-sm font-normal text-gray-500">
-                ({filteredDeliveries.length} {filteredDeliveries.length === 1 ? 'record' : 'records'})
-              </span>
-            </h2>
-            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-              <div className="relative flex-1 min-w-[200px]">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                <input
-                  type="text"
-                  placeholder="Search by name, phone, or company..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                />
-              </div>
-              <div className="flex items-center gap-2 bg-white px-3 py-2 border border-gray-300 rounded-lg">
-                <Calendar className="text-gray-400" size={18} />
-                <DatePicker
-                  selected={selectedDate}
-                  onChange={(date) => setSelectedDate(date)}
-                  placeholderText="Filter by date"
-                  className="w-32 focus:outline-none"
-                  dateFormat="MMMM d, yyyy"
-                  isClearable
-                />
-              </div>
-              <button
-                onClick={() => {
-                  setShowForm(true);
-                  setUniqueIdData(null);
-                }}
-                disabled={deliveries.some(d => d.status === 'pending')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${deliveries.some(d => d.status === 'pending')
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white shadow'
-                  }`}
-              >
-                <Plus size={18} /> New Delivery
-              </button>
-            </div>
-          </div>
-
-          {/* Delivery Form / Unique ID Display */}
-          {(showForm || uniqueIdData) && (
-            <div className="mb-8 bg-gray-50 p-6 rounded-xl border border-gray-200">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-gray-800">
-                  {uniqueIdData ? 'Delivery Pass Code' : 'Create New Delivery'}
-                </h3>
+          <div className="p-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+              <h2 className="text-xl font-bold text-gray-800">
+                {activeTab === 'active' ? 'Active Deliveries' : 'Delivery History'}
+                <span className="ml-2 text-sm font-normal text-gray-500">
+                  ({filteredDeliveries.length} {filteredDeliveries.length === 1 ? 'record' : 'records'})
+                </span>
+              </h2>
+              <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                  <input
+                    type="text"
+                    placeholder="Search by name, phone, or company..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                  />
+                </div>
+                <div className="flex items-center gap-2 bg-white px-3 py-2 border border-gray-300 rounded-lg">
+                  <Calendar className="text-gray-400" size={18} />
+                  <DatePicker
+                    selected={selectedDate}
+                    onChange={(date) => setSelectedDate(date)}
+                    placeholderText="Filter by date"
+                    className="w-32 focus:outline-none"
+                    dateFormat="MMMM d, yyyy"
+                    isClearable
+                  />
+                </div>
                 <button
                   onClick={() => {
-                    setShowForm(false);
-                    setUniqueIdData(null);
+                    setShowForm(true);
+                    setCurrentDelivery(null);
                     setDeliveryForm({
                       deliveryPersonName: '',
                       phone: '+91',
-                      apartment: residentData?.flat_no || '',
+                      apartment: resident?.flat_no || '',
                       deliveryCompany: '',
                       expectedTime: new Date()
                     });
+                    setPhoneError('');
                   }}
-                  className="text-gray-500 hover:text-gray-700"
+                   className="flex items-center gap-2 px-4 py-2 rounded-lg transition 
+                    
+                  bg-blue-600 hover:bg-blue-700 text-white shadow"
                 >
-                  <X size={20} />
+                  <Plus size={18} /> New Delivery
                 </button>
               </div>
+            </div>
 
-              {uniqueIdData ? (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  {/* Unique ID Section */}
-                  <div className="bg-white p-6 rounded-xl shadow border border-gray-200 flex flex-col items-center">
-                    <div className="mb-4 p-4 bg-blue-50 rounded border border-blue-200">
-                      <div className="text-2xl font-mono font-bold text-blue-800">
-                        {uniqueIdData.uniqueId || 'No code available'}
+            {/* Delivery Form / Unique ID Display */}
+            {(showForm || currentDelivery) && (
+              <div className="mb-8 bg-gray-50 p-6 rounded-xl border border-gray-200">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold text-gray-800">
+                    {currentDelivery ? 'Delivery Pass Code' : 'Create New Delivery'}
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setShowForm(false);
+                      setCurrentDelivery(null);
+                      setDeliveryForm({
+                        deliveryPersonName: '',
+                        phone: '+91',
+                        apartment: resident?.flat_no || '',
+                        deliveryCompany: '',
+                        expectedTime: new Date()
+                      });
+                      setPhoneError('');
+                      setLogs([]);
+                    }}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                {currentDelivery ? (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Unique ID Section */}
+                    <div className="bg-white p-6 rounded-xl border border-gray-200">
+                      <div className="mb-4 p-4 bg-blue-50 rounded border border-blue-200 text-center">
+                        <div className="text-2xl font-mono font-bold text-blue-800">
+                          {currentDelivery.uniqueId || 'No code available'}
+                        </div>
                       </div>
+                      <div className="space-y-3 text-sm">
+                        <div className="flex justify-between">
+                          <span className="font-medium text-gray-600">Delivery Person:</span>
+                          <span className="text-gray-800">{currentDelivery.deliveryPersonName}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="font-medium text-gray-600">Phone:</span>
+                          <span className="text-gray-800">{currentDelivery.phone}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="font-medium text-gray-600">Company:</span>
+                          <span className="text-gray-800">{currentDelivery.deliveryCompany}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="font-medium text-gray-600">Apartment:</span>
+                          <span className="text-gray-800">{currentDelivery.apartment}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="font-medium text-gray-600">Expected Time:</span>
+                          <span className="text-gray-800">{formatDateTime(currentDelivery.expectedTime)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="font-medium text-gray-600">Status:</span>
+                          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusColor(currentDelivery.status)}`}>
+                            {formatStatus(currentDelivery.status)}
+                          </span>
+                        </div>
+                      </div>
+                      <DeliveryLogs logs={logs} />
                     </div>
 
-                    <div className="w-full space-y-3">
-                      <div className="flex justify-between border-b pb-2">
-                        <span className="font-medium text-gray-600">Delivery Person:</span>
-                        <span className="text-gray-800">{uniqueIdData.deliveryPersonName}</span>
-                      </div>
-                      <div className="flex justify-between border-b pb-2">
-                        <span className="font-medium text-gray-600">Phone:</span>
-                        <span className="text-gray-800">{uniqueIdData.phone}</span>
-                      </div>
-                      <div className="flex justify-between border-b pb-2">
-                        <span className="font-medium text-gray-600">Company:</span>
-                        <span className="text-gray-800">{uniqueIdData.deliveryCompany}</span>
-                      </div>
-                      <div className="flex justify-between border-b pb-2">
-                        <span className="font-medium text-gray-600">Apartment:</span>
-                        <span className="text-gray-800">{uniqueIdData.apartment}</span>
-                      </div>
-                      <div className="flex justify-between border-b pb-2">
-                        <span className="font-medium text-gray-600">Expected Time:</span>
-                        <span className="text-gray-800">{formatDateTime(uniqueIdData.expectedTime)}</span>
-                      </div>
-                      <div className="flex justify-between border-b pb-2">
-                        <span className="font-medium text-gray-600">Status:</span>
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${uniqueIdData.status === 'approved' ? 'bg-green-100 text-green-800' :
-                            uniqueIdData.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                              uniqueIdData.status === 'completed' ? 'bg-blue-100 text-blue-800' :
-                                'bg-gray-100 text-gray-800'
-                          }`}>
-                          {formatStatus(uniqueIdData.status)}
-                        </span>
-                      </div>
+                    {/* Edit Form Section */}
+                    <div className="bg-white p-6 rounded-xl border border-gray-200">
+                      <h4 className="font-medium text-gray-800 mb-4">Edit Delivery Details</h4>
+                      <form onSubmit={handleUpdateDelivery} className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Person Name *</label>
+                          <div className="relative">
+                            <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                            <input
+                              type="text"
+                              value={deliveryForm.deliveryPersonName}
+                              onChange={(e) => setDeliveryForm({ ...deliveryForm, deliveryPersonName: e.target.value })}
+                              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                              required
+                              placeholder="Enter delivery person's name"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
+                          <PhoneInput
+                            value={deliveryForm.phone}
+                            onChange={(phone) => setDeliveryForm({ ...deliveryForm, phone })}
+                            error={phoneError}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Company *</label>
+                          <select
+                            value={deliveryForm.deliveryCompany}
+                            onChange={(e) => setDeliveryForm({ ...deliveryForm, deliveryCompany: e.target.value })}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                            required
+                          >
+                            <option value="" disabled>Select a delivery company</option>
+                            {DELIVERY_COMPANIES.map(company => (
+                              <option key={company} value={company}>{company}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Expected Delivery Time *</label>
+                          <div className="relative flex items-center gap-2 bg-white px-4 py-2 border border-gray-300 rounded-lg">
+                            <Calendar className="text-gray-400" size={18} />
+                            <DatePicker
+                              selected={deliveryForm.expectedTime}
+                              onChange={(date) => setDeliveryForm({ ...deliveryForm, expectedTime: date })}
+                              showTimeSelect
+                              timeFormat="HH:mm"
+                              timeIntervals={15}
+                              dateFormat="MMMM d, yyyy h:mm aa"
+                              className="w-full focus:outline-none"
+                              required
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-3 pt-2">
+                          <button
+                            type="submit"
+                            disabled={isSending}
+                            className={`flex-1 py-2 rounded-lg transition flex items-center justify-center gap-2 ${
+                              isSending ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'
+                            }`}
+                          >
+                            <Edit size={16} /> Update Delivery
+                          </button>
+                          
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteDelivery(currentDelivery._id)}
+                            disabled={isSending}
+                            className="flex-1 bg-red-100 hover:bg-red-200 text-red-700 py-2 px-4 rounded-lg transition flex items-center justify-center gap-2"
+                          >
+                            <Trash2 size={16} /> Delete
+                          </button>
+                        </div>
+                      </form>
                     </div>
                   </div>
-
-                  {/* Edit Form Section */}
-                  <div className="bg-white p-6 rounded-xl shadow border border-gray-200">
-                    <h4 className="font-medium text-gray-800 mb-4">Edit Delivery Details</h4>
-                    <form onSubmit={handleUpdateDelivery} className="space-y-4">
+                ) : (
+                  <form onSubmit={handleCreateDelivery} className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Person Name *</label>
-                        <input
-                          type="text"
-                          value={deliveryForm.deliveryPersonName}
-                          onChange={(e) => setDeliveryForm({ ...deliveryForm, deliveryPersonName: e.target.value })}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                          required
-                          placeholder="Enter delivery person's name"
-                        />
+                        <div className="relative">
+                          <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                          <input
+                            type="text"
+                            value={deliveryForm.deliveryPersonName}
+                            onChange={(e) => setDeliveryForm({ ...deliveryForm, deliveryPersonName: e.target.value })}
+                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                            required
+                            placeholder="Enter delivery person's name"
+                          />
+                        </div>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
@@ -512,21 +735,36 @@ const DeliveryManagement = () => {
                         />
                       </div>
                       <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Apartment *</label>
+                        <input
+                          type="text"
+                          value={deliveryForm.apartment}
+                          onChange={(e) => setDeliveryForm({ ...deliveryForm, apartment: e.target.value })}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                          required
+                          placeholder="Enter apartment number"
+                          readOnly
+                        />
+                      </div>
+                      <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Company *</label>
                         <select
                           value={deliveryForm.deliveryCompany}
                           onChange={(e) => setDeliveryForm({ ...deliveryForm, deliveryCompany: e.target.value })}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                           required
                         >
                           <option value="" disabled>Select a delivery company</option>
-                          {DELIVERY_COMPANIES.map((company) => (
+                          {DELIVERY_COMPANIES.map(company => (
                             <option key={company} value={company}>{company}</option>
                           ))}
                         </select>
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Expected Delivery Time *</label>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Expected Delivery Time *</label>
+                      <div className="relative flex items-center gap-2 bg-white px-4 py-2 border border-gray-300 rounded-lg">
+                        <Calendar className="text-gray-400" size={18} />
                         <DatePicker
                           selected={deliveryForm.expectedTime}
                           onChange={(date) => setDeliveryForm({ ...deliveryForm, expectedTime: date })}
@@ -534,97 +772,32 @@ const DeliveryManagement = () => {
                           timeFormat="HH:mm"
                           timeIntervals={15}
                           dateFormat="MMMM d, yyyy h:mm aa"
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                          className="w-full focus:outline-none"
                           required
                         />
                       </div>
-                      <div className="flex gap-3 pt-2">
-                        <button
-                          type="submit"
-                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition flex items-center justify-center gap-2 shadow"
-                        >
-                          <Edit size={16} /> Update Delivery
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteDelivery(uniqueIdData._id)}
-                          className="flex-1 bg-red-100 hover:bg-red-200 text-red-700 py-2 px-4 rounded-lg transition flex items-center justify-center gap-2"
-                        >
-                          <Trash2 size={16} /> Delete
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              ) : (
-                <form onSubmit={handleCreateDelivery} className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Person Name *</label>
-                      <input
-                        type="text"
-                        value={deliveryForm.deliveryPersonName}
-                        onChange={(e) => setDeliveryForm({ ...deliveryForm, deliveryPersonName: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                        required
-                        placeholder="Enter delivery person's name"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
-                      <PhoneInput
-                        value={deliveryForm.phone}
-                        onChange={(phone) => setDeliveryForm({ ...deliveryForm, phone })}
-                        error={phoneError}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Apartment *</label>
-                      <input
-                        type="text"
-                        value={deliveryForm.apartment}
-                        onChange={(e) => setDeliveryForm({ ...deliveryForm, apartment: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                        required
-                        placeholder="Enter apartment number"
-                        readOnly
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Company *</label>
-                      <select
-                        value={deliveryForm.deliveryCompany}
-                        onChange={(e) => setDeliveryForm({ ...deliveryForm, deliveryCompany: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                        required
-                      >
-                        <option value="" disabled>Select a delivery company</option>
-                        {DELIVERY_COMPANIES.map((company) => (
-                          <option key={company} value={company}>{company}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Expected Delivery Time *</label>
-                      <DatePicker
-                        selected={deliveryForm.expectedTime}
-                        onChange={(date) => setDeliveryForm({ ...deliveryForm, expectedTime: date })}
-                        showTimeSelect
-                        timeFormat="HH:mm"
-                        timeIntervals={15}
-                        dateFormat="MMMM d, yyyy h:mm aa"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                        required
-                      />
                     </div>
                     <div className="flex gap-3 pt-4">
                       <button
                         type="submit"
-                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition flex items-center justify-center gap-2 shadow"
+                        disabled={isSending}
+                        className={`flex-1 py-2 rounded-lg transition flex items-center justify-center gap-2 ${
+                          isSending ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'
+                        }`}
                       >
-                        <Plus size={16} /> Generate Delivery Code
+                        {isSending ? (
+                          <span className="flex items-center">
+                            <svg className="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                            </svg>
+                            Processing...
+                          </span>
+                        ) : (
+                          <>
+                            <Plus size={16} /> Generate Delivery Code
+                          </>
+                        )}
                       </button>
                       <button
                         type="button"
@@ -633,217 +806,225 @@ const DeliveryManagement = () => {
                           setDeliveryForm({
                             deliveryPersonName: '',
                             phone: '+91',
-                            apartment: residentData?.flat_no || '',
+                            apartment: resident?.flat_no || '',
                             deliveryCompany: '',
                             expectedTime: new Date()
                           });
+                          setPhoneError('');
                         }}
                         className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 px-4 rounded-lg transition flex items-center justify-center gap-2"
                       >
-                        Cancel
+                        <X size={16} /> Cancel
                       </button>
                     </div>
-                  </div>
-                </form>
-              )}
-            </div>
-          )}
-
-          {/* Deliveries List */}
-          {filteredDeliveries.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <Truck size={48} className="mx-auto text-gray-300 mb-4" />
-              <p>No {activeTab === 'active' ? 'active' : 'completed'} deliveries found</p>
-              {(searchTerm || selectedDate) && (
-                <button
-                  onClick={() => {
-                    setSearchTerm('');
-                    setSelectedDate(null);
-                  }}
-                  className="mt-4 text-blue-600 hover:text-blue-800 flex items-center justify-center gap-1 mx-auto"
-                >
-                  <X size={16} /> Clear filters
-                </button>
-              )}
-            </div>
-          ) : (
-            <>
-              <div className="overflow-x-auto rounded-lg border border-gray-200 shadow">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Delivery Details</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timings</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {currentItems.map((delivery) => (
-                      <tr key={delivery._id} className="hover:bg-gray-50 transition">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center">
-                            <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
-                              <User className="text-blue-600" size={18} />
-                            </div>
-                            <div className="ml-4">
-                              <div className="text-sm font-medium text-gray-900">{delivery.deliveryPersonName}</div>
-                              <div className="text-sm text-gray-500">{delivery.phone}</div>
-                              <div className="text-xs text-gray-400 mt-1">
-                                Apartment {delivery.apartment}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm text-gray-900 font-medium">{delivery.deliveryCompany}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${delivery.status === 'approved' ? 'bg-green-100 text-green-800' :
-                              delivery.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                delivery.status === 'completed' ? 'bg-blue-100 text-blue-800' :
-                                  'bg-gray-100 text-gray-800'
-                            }`}>
-                            {formatStatus(delivery.status)}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">
-                            <div className="flex items-center gap-1">
-                              <Clock size={14} className="text-gray-500" />
-                              {formatDateTime(delivery.expectedTime)}
-                            </div>
-                            {delivery.entryTime && (
-                              <div className="flex items-center gap-1 mt-1">
-                                <ArrowRightCircle size={14} className="text-green-500" />
-                                {formatTime(delivery.entryTime)}
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => {
-                                setDeliveryForm({
-                                  deliveryPersonName: delivery.deliveryPersonName,
-                                  phone: delivery.phone,
-                                  apartment: delivery.apartment,
-                                  deliveryCompany: delivery.deliveryCompany,
-                                  expectedTime: new Date(delivery.expectedTime)
-                                });
-                                setUniqueIdData(delivery);
-                                setShowForm(true);
-                              }}
-                              disabled={delivery.status === 'completed'}
-                              className={`p-2 rounded-lg transition ${delivery.status === 'completed'
-                                  ? 'text-gray-400 cursor-not-allowed'
-                                  : 'text-blue-600 hover:bg-blue-100'
-                                }`}
-                              title="Edit"
-                            >
-                              <Edit size={18} />
-                            </button>
-                            <button
-                              onClick={() => {
-                                setUniqueIdData(delivery);
-                                setShowForm(false);
-                              }}
-                              disabled={!delivery.uniqueId}
-                              className={`p-2 rounded-lg transition ${!delivery.uniqueId
-                                  ? 'text-gray-400 cursor-not-allowed'
-                                  : 'text-purple-600 hover:bg-purple-100'
-                                }`}
-                              title="View Delivery Code"
-                            >
-                              <Package size={18} />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteDelivery(delivery._id)}
-                              disabled={delivery.status === 'completed'}
-                              className={`p-2 rounded-lg transition ${delivery.status === 'completed'
-                                  ? 'text-gray-400 cursor-not-allowed'
-                                  : 'text-red-600 hover:bg-red-100'
-                                }`}
-                              title="Delete"
-                            >
-                              <Trash2 size={18} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                  </form>
+                )}
               </div>
+            )}
 
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between mt-4 px-2">
+            {/* Deliveries List */}
+            {isLoading && !showForm && !currentDelivery ? (
+              <div className="flex justify-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+              </div>
+            ) : filteredDeliveries.length === 0 ? (
+              <div className="text-center py-12">
+                <Truck size={48} className="mx-auto text-gray-300 mb-4" />
+                <p className="text-lg text-gray-600 mb-2">
+                  {searchTerm || selectedDate
+                    ? 'No deliveries found matching your criteria'
+                    : `No ${activeTab === 'active' ? 'active' : 'completed'} deliveries found`}
+                </p>
+                {(searchTerm || selectedDate) && (
                   <button
-                    onClick={() => paginate(Math.max(1, currentPage - 1))}
-                    disabled={currentPage === 1}
-                    className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === 1 ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-100'}`}
+                    className="mt-4 text-blue-600 hover:text-blue-800 flex items-center justify-center gap-1 mx-auto"
+                    onClick={() => {
+                      setSearchTerm('');
+                      setSelectedDate(null);
+                    }}
                   >
-                    <ChevronLeft size={16} /> Previous
+                    <X size={16} /> Clear filters
                   </button>
+                )}
+              </div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Delivery Details</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timings</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {currentItems.map(delivery => (
+                        <tr key={delivery._id} className="hover:bg-gray-50 transition">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center">
+                              <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                <User className="text-blue-600" size={18} />
+                              </div>
+                              <div className="ml-4">
+                                <div className="text-sm font-medium text-gray-900">{delivery.deliveryPersonName}</div>
+                                <div className="text-sm text-gray-500">{delivery.phone}</div>
+                                <div className="text-xs text-gray-400 mt-1">
+                                  Apartment {delivery.apartment}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="text-sm text-gray-900 font-medium">{delivery.deliveryCompany}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusColor(delivery.status)}`}>
+                              {formatStatus(delivery.status)}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              <div className="flex items-center gap-1">
+                                <Clock size={14} className="text-gray-500" />
+                                {formatDateTime(delivery.expectedTime)}
+                              </div>
+                              {delivery.entryTime && (
+                                <div className="flex items-center gap-1 mt-1">
+                                  <ArrowRightCircle size={14} className="text-green-500" />
+                                  {formatTime(delivery.entryTime)}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => {
+                                  setDeliveryForm({
+                                    deliveryPersonName: delivery.deliveryPersonName,
+                                    phone: delivery.phone,
+                                    apartment: delivery.apartment,
+                                    deliveryCompany: delivery.deliveryCompany,
+                                    expectedTime: new Date(delivery.expectedTime)
+                                  });
+                                  setCurrentDelivery(delivery);
+                                  setShowForm(true);
+                                }}
+                                disabled={delivery.status === 'completed'}
+                                className={`p-2 rounded-lg transition ${
+                                  delivery.status === 'completed'
+                                    ? 'text-gray-400 cursor-not-allowed'
+                                    : 'text-blue-600 hover:bg-blue-100'
+                                }`}
+                                title="Edit"
+                              >
+                                <Edit size={18} />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setCurrentDelivery(delivery);
+                                  setShowForm(false);
+                                  fetchDeliveryLogs(delivery._id);
+                                }}
+                                disabled={!delivery.uniqueId}
+                                className={`p-2 rounded-lg transition ${
+                                  !delivery.uniqueId
+                                    ? 'text-gray-400 cursor-not-allowed'
+                                    : 'text-purple-600 hover:bg-purple-100'
+                                }`}
+                                title="View Delivery Code"
+                              >
+                                <Package size={18} />
+                              </button>
 
-                  <div className="flex gap-1">
-                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                      let pageNum;
-                      if (totalPages <= 5) {
-                        pageNum = i + 1;
-                      } else if (currentPage <= 3) {
-                        pageNum = i + 1;
-                      } else if (currentPage >= totalPages - 2) {
-                        pageNum = totalPages - 4 + i;
-                      } else {
-                        pageNum = currentPage - 2 + i;
-                      }
-
-                      return (
-                        <button
-                          key={pageNum}
-                          onClick={() => paginate(pageNum)}
-                          className={`w-8 h-8 rounded-full flex items-center justify-center ${currentPage === pageNum
-                              ? 'bg-blue-600 text-white'
-                              : 'text-gray-700 hover:bg-gray-100'
-                            }`}
-                        >
-                          {pageNum}
-                        </button>
-                      );
-                    })}
-
-                    {totalPages > 5 && currentPage < totalPages - 2 && (
-                      <span className="flex items-end px-1">...</span>
-                    )}
-
-                    {totalPages > 5 && currentPage >= totalPages - 2 && (
-                      <button
-                        onClick={() => paginate(totalPages)}
-                        className={`w-8 h-8 rounded-full flex items-center justify-center ${currentPage === totalPages
-                            ? 'bg-blue-600 text-white'
-                            : 'text-gray-700 hover:bg-gray-100'
-                          }`}
-                      >
-                        {totalPages}
-                      </button>
-                    )}
-                  </div>
-
-                  <button
-                    onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
-                    disabled={currentPage === totalPages}
-                    className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === totalPages ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-100'}`}
-                  >
-                    Next <ChevronRight size={16} />
-                  </button>
+                              <button
+                                onClick={() => handleDeleteDelivery(delivery._id)}
+                                disabled={delivery.status === 'completed'}
+                                className={`p-2 rounded-lg transition ${
+                                  delivery.status === 'completed'
+                                    ? 'text-gray-400 cursor-not-allowed'
+                                    : 'text-red-600 hover:bg-red-100'
+                                }`}
+                                title="Delete"
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              )}
-            </>
-          )}
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between mt-4 px-6 py-4">
+                    <button
+                      onClick={() => paginate(Math.max(1, currentPage - 1))}
+                      disabled={currentPage === 1}
+                      className={`flex items-center gap-2 px-3 py-1 rounded ${
+                        currentPage === 1 ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      <ChevronLeft size={16} /> Previous
+                    </button>
+                    <div className="flex gap-1">
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        let pageNum;
+                        if (totalPages <= 5) {
+                          pageNum = i + 1;
+                        } else if (currentPage <= 3) {
+                          pageNum = i + 1;
+                        } else if (currentPage >= totalPages - 2) {
+                          pageNum = totalPages - 4 + i;
+                        } else {
+                          pageNum = currentPage - 2 + i;
+                        }
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => paginate(pageNum)}
+                            className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                              currentPage === pageNum ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-100'
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      })}
+                      {totalPages > 5 && currentPage < totalPages - 2 && (
+                        <span className="flex items-end px-1">...</span>
+                      )}
+                      {totalPages > 5 && currentPage >= totalPages - 2 && (
+                        <button
+                          onClick={() => paginate(totalPages)}
+                          className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                            currentPage === totalPages ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-100'
+                          }`}
+                        >
+                          {totalPages}
+                        </button>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
+                      disabled={currentPage === totalPages}
+                      className={`flex items-center gap-2 px-3 py-1 rounded ${
+                        currentPage === totalPages ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      Next <ChevronRight size={16} />
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>

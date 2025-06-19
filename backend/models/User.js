@@ -56,8 +56,13 @@ const userSchema = new mongoose.Schema(
       {
         name: String,
         relation: String,
-        gender: { type: String, enum: ["male", "female", "-"], default: "-" },
-        profilePicture: String
+        gender: {
+          type: String,
+          enum: ["male", "female", "-"],
+          lowercase: true
+        },
+        profilePicture: String,
+        
       }
     ]
   },

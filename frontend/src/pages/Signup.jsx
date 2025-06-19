@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { Shield, User, Mail, Lock, Phone, ChevronDown } from "lucide-react";
-import SignupImage from "../assets/signup.jpeg";
+// import SignupImage from "../assets/signup.jpeg";
 
 const STAFF_REGISTER_URL = "http://localhost:5000/api/auth/register";
 
@@ -114,13 +114,13 @@ const AdminSecurityRegister = () => {
               <Shield className="h-16 w-16 mx-auto mb-4" />
               <h1 className="text-3xl font-bold mb-2">Staff Registration</h1>
               <p className="text-gray-200">Register for administrative access</p>
-              <div className="mt-8">
+              {/* <div className="mt-8">
                 <img 
                   src={SignupImage} 
                   alt="Security System" 
                   className="rounded-lg shadow-lg border-4 border-white/20 object-cover h-64 w-full"
                 />
-              </div>
+              </div> */}
             </div>
           </div>
 

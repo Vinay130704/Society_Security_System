@@ -1,870 +1,631 @@
-import { useState, useEffect } from 'react';
-import { User, Camera, X, Edit2, Save, Plus, Trash2, Badge } from 'lucide-react';
-import { toast } from 'react-toastify';
+import React, { useState, useEffect } from 'react';
+import { User, Edit, Camera, Plus, Trash2, Save, X, Phone, Mail, Home, Users } from 'lucide-react';
 import axios from 'axios';
 
-const ProfileEdit = () => {
+const ResidentProfileManager = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [editMode, setEditMode] = useState(false);
-  const [familyEditId, setFamilyEditId] = useState(null);
-  const [profilePic, setProfilePic] = useState(null);
-  const [previewPic, setPreviewPic] = useState('');
-  const [familyMemberPic, setFamilyMemberPic] = useState(null);
-  const [familyMemberPreview, setFamilyMemberPreview] = useState('');
-  const [formData, setFormData] = useState({
+  const [editFamilyMember, setEditFamilyMember] = useState(null);
+  const [showAddFamily, setShowAddFamily] = useState(false);
+  const [uploadingPicture, setUploadingPicture] = useState(false);
+  const [profileForm, setProfileForm] = useState({
     name: '',
     email: '',
     phone: '',
     flat_no: ''
   });
-
-  const [newFamilyMember, setNewFamilyMember] = useState({
+  const [familyForm, setFamilyForm] = useState({
     name: '',
     relation: '',
-    gender: '',
-    profilePicture: null
+    gender: ''
   });
 
   const API_BASE_URL = 'http://localhost:5000/api';
 
-  const getAuthHeaders = (contentType = 'application/json') => {
-    const headers = {
-      'Authorization': `Bearer ${localStorage.getItem('token')}`
-    };
-
-    if (contentType) {
-      headers['Content-Type'] = contentType;
+  // Set auth token
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     }
+    fetchProfile();
+  }, []);
 
-    return { headers };
-  };
-
-  // Fetch user profile data
   const fetchProfile = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(
-        `${API_BASE_URL}/profile/get-profile`,
-        getAuthHeaders()
-      );
-
-      if (!response.data || !response.data.user) {
-        throw new Error('Invalid profile data structure');
-      }
-
-      const userData = response.data.user;
-      setUser(userData);
-      setFormData({
-        name: userData.name || '',
-        email: userData.email || '',
-        phone: userData.phone || '',
-        flat_no: userData.flat_no || ''
-      });
-
-      if (userData.profilePicture) {
-        setPreviewPic(getImageUrl(userData.profilePicture));
+      const response = await axios.get(`${API_BASE_URL}/profile/get-profile`);
+      
+      if (response.data.success) {
+        setUser(response.data.user);
+        setProfileForm({
+          name: response.data.user.name || '',
+          email: response.data.user.email || '',
+          phone: response.data.user.phone || '',
+          flat_no: response.data.user.flat_no || ''
+        });
+      } else {
+        setError(response.data.message || 'Failed to fetch profile');
       }
     } catch (error) {
-      console.error('Profile fetch error:', error);
-      toast.error(error.response?.data?.message || 'Failed to load profile');
-      setUser(null);
+      console.error('Fetch profile error:', error);
+      setError(error.response?.data?.message || 'Network error. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Helper function to construct image URL
-  const getImageUrl = (imagePath) => {
-    if (!imagePath) return '';
-    if (imagePath.startsWith('http')) return imagePath;
-    return `${API_BASE_URL.replace('/api', '')}/${imagePath.replace(/\\/g, '/')}`;
-  };
-
-  useEffect(() => {
-    fetchProfile();
-  }, []);
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
+  const updateProfile = async () => {
     try {
-      // Validation
-      if (!formData.name || !formData.email || !formData.phone) {
-        toast.error('Please fill all required fields');
+      if (!profileForm.name.trim()) {
+        setError('Name is required');
         return;
       }
 
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(formData.email)) {
-        toast.error('Please enter a valid email address');
-        return;
+      const response = await axios.put(`${API_BASE_URL}/profile/update-profile`, profileForm);
+      
+      if (response.data.success) {
+        setUser(prev => ({ ...prev, ...profileForm }));
+        setEditMode(false);
+        setError('');
+      } else {
+        setError(response.data.message || 'Failed to update profile');
       }
-
-      if (!/^\d{10,15}$/.test(formData.phone.replace(/[^\d]/g, ''))) {
-        toast.error('Please enter a valid phone number (10-15 digits)');
-        return;
-      }
-
-      // Update profile
-      const response = await axios.put(
-        `${API_BASE_URL}/profile/update-profile`,
-        formData,
-        getAuthHeaders()
-      );
-
-      if (!response.data || !response.data.user) {
-        throw new Error('Invalid update response');
-      }
-
-      setUser(prevUser => ({
-        ...prevUser,
-        ...response.data.user
-      }));
-
-      setEditMode(false);
-      toast.success('Profile updated successfully');
     } catch (error) {
-      console.error('Update error:', error);
-      toast.error(error.response?.data?.message || 'Failed to update profile');
+      console.error('Update profile error:', error);
+      setError(error.response?.data?.message || 'Network error. Please try again.');
     }
   };
 
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image size should be less than 5MB');
-      return;
-    }
-
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
-    if (!allowedTypes.includes(file.type)) {
-      toast.error('Only JPG, JPEG, and PNG files are allowed');
-      return;
-    }
-
-    setProfilePic(file);
-    setPreviewPic(URL.createObjectURL(file));
-  };
-
-  const uploadProfilePicture = async () => {
-    if (!profilePic) return;
-
-    const formData = new FormData();
-    formData.append('profilePicture', profilePic);
-
+  const updateProfilePicture = async (file) => {
     try {
-      const response = await axios.post(
-        `${API_BASE_URL}/profile/picture`,
-        formData,
-        {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'multipart/form-data'
-          }
-        }
-      );
-
-      if (!response.data || !response.data.profilePicture) {
-        throw new Error('Invalid image upload response');
-      }
-
-      setUser(prev => ({
-        ...prev,
-        profilePicture: response.data.profilePicture
-      }));
-
-      setProfilePic(null);
-      toast.success('Profile picture updated');
-    } catch (error) {
-      console.error('Upload error:', error);
-      toast.error(error.response?.data?.message || 'Failed to upload picture');
-    }
-  };
-
-  const handleFamilyMemberFileChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image size should be less than 5MB');
-      return;
-    }
-
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
-    if (!allowedTypes.includes(file.type)) {
-      toast.error('Only JPG, JPEG, and PNG files are allowed');
-      return;
-    }
-
-    setFamilyMemberPic(file);
-    setFamilyMemberPreview(URL.createObjectURL(file));
-    setNewFamilyMember(prev => ({
-      ...prev,
-      profilePicture: file
-    }));
-  };
-
-  const handleAddFamilyMember = async () => {
-    // Enhanced validation
-    if (!newFamilyMember.name.trim() || newFamilyMember.name.trim().length < 2) {
-      toast.error('Name must be at least 2 characters');
-      return;
-    }
-    if (!newFamilyMember.relation.trim() || newFamilyMember.relation.trim().length < 2) {
-      toast.error('Relation must be at least 2 characters');
-      return;
-    }
-    if (!newFamilyMember.gender) {
-      toast.error('Please select gender');
-      return;
-    }
-
-    try {
+      setUploadingPicture(true);
+      setError('');
+      
       const formData = new FormData();
-      formData.append('name', newFamilyMember.name.trim());
-      formData.append('relation', newFamilyMember.relation.trim());
-      formData.append('gender', newFamilyMember.gender.toLowerCase());
+      formData.append('profilePicture', file);
 
-      // Only append profilePicture if it exists and is valid
-      if (newFamilyMember.profilePicture instanceof File) {
-        if (newFamilyMember.profilePicture.size > 5 * 1024 * 1024) {
-          toast.error('Profile picture must be less than 5MB');
-          return;
+      const response = await axios.post(`${API_BASE_URL}/profile/picture`, formData, {
+        headers: { 
+          'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
-        formData.append('profilePicture', newFamilyMember.profilePicture);
-      }
-
-      const response = await axios.post(
-        `${API_BASE_URL}/profile/add-familymember`,
-        formData,
-        {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'multipart/form-data'
-          }
-        }
-      );
-
-      if (!response.data?.familyMember) {
-        throw new Error('Invalid response format from server');
-      }
-
-      setUser(prev => ({
-        ...prev,
-        familyMembers: [...(prev.familyMembers || []), response.data.familyMember]
-      }));
-
-      // Reset form
-      setNewFamilyMember({
-        name: '',
-        relation: '',
-        gender: '',
-        profilePicture: null
       });
-      setFamilyMemberPic(null);
-      setFamilyMemberPreview('');
 
-      toast.success('Family member added successfully');
-    } catch (error) {
-      console.error('Add family error:', error);
-      
-      let errorMessage = 'Failed to add family member';
-      if (error.response) {
-        // Try to get detailed error message from server
-        console.log('Error response data:', error.response.data);
-        
-        errorMessage = error.response.data?.message || 
-                      error.response.data?.error?.message || 
-                      error.response.data?.error ||
-                      errorMessage;
-        
-        // Handle specific validation errors
-        if (error.response.data?.errors) {
-          errorMessage = Object.values(error.response.data.errors)
-                            .map(err => err.message || err)
-                            .join(', ');
-        }
+      if (response.data.success) {
+        setUser(prev => ({
+          ...prev,
+          profilePicture: response.data.profilePicture
+        }));
+        setError('');
+      } else {
+        setError(response.data.message || 'Failed to update profile picture');
       }
-      
-      toast.error(errorMessage);
+    } catch (error) {
+      console.error('Profile picture update error:', error);
+      setError(error.response?.data?.message || 'Network error. Please try again.');
+    } finally {
+      setUploadingPicture(false);
     }
   };
 
-  const handleUpdateFamilyMember = async (memberId) => {
+  const addFamilyMember = async () => {
     try {
-      const memberToUpdate = user.familyMembers.find(m => m._id === memberId);
-      if (!memberToUpdate) {
-        toast.error('Family member not found');
+      if (!familyForm.name.trim() || !familyForm.relation.trim()) {
+        setError('Name and relation are required');
         return;
       }
 
-      const formData = new FormData();
-      formData.append('memberId', memberId);
-      formData.append('name', memberToUpdate.name);
-      formData.append('relation', memberToUpdate.relation);
-      formData.append('gender', memberToUpdate.gender);
-
-      if (familyMemberPic) {
-        formData.append('profilePicture', familyMemberPic);
+      const response = await axios.post(`${API_BASE_URL}/profile/add-familymember`, familyForm);
+      
+      if (response.data.success) {
+        setUser(prev => ({
+          ...prev,
+          familyMembers: [...(prev.familyMembers || []), response.data.familyMember]
+        }));
+        setShowAddFamily(false);
+        setFamilyForm({ name: '', relation: '', gender: '' });
+        setError('');
+      } else {
+        setError(response.data.message || 'Failed to add family member');
       }
-
-      const response = await axios.put(
-        `${API_BASE_URL}/profile/edit-family`,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        }
-      );
-
-      if (!response.data || !response.data.familyMember) {
-        throw new Error('Failed to update family member');
-      }
-
-      // Update the specific family member in state
-      setUser(prev => ({
-        ...prev,
-        familyMembers: prev.familyMembers.map(member =>
-          member._id === memberId ? response.data.familyMember : member
-        )
-      }));
-
-      setFamilyEditId(null);
-      setFamilyMemberPic(null);
-      setFamilyMemberPreview('');
-      toast.success('Family member updated successfully');
     } catch (error) {
-      console.error('Update error:', error);
-      toast.error(error.response?.data?.message || 'Failed to update family member');
+      console.error('Add family member error:', error);
+      setError(error.response?.data?.message || 'Network error. Please try again.');
     }
   };
 
-  const handleRemoveFamilyMember = async (memberId) => {
+  const updateFamilyMember = async () => {
     try {
-      if (!window.confirm('Are you sure you want to remove this family member?')) {
+      if (!familyForm.name.trim() || !familyForm.relation.trim()) {
+        setError('Name and relation are required');
         return;
       }
 
-      await axios.delete(
-        `${API_BASE_URL}/profile/family/${memberId}`,
-        getAuthHeaders()
-      );
-
-      setUser(prev => ({
-        ...prev,
-        familyMembers: prev.familyMembers.filter(m => m._id !== memberId)
-      }));
-
-      toast.success('Family member removed successfully');
+      const response = await axios.put(`${API_BASE_URL}/profile/edit-family`, {
+        memberId: editFamilyMember._id,
+        ...familyForm
+      });
+      
+      if (response.data.success) {
+        setUser(prev => ({
+          ...prev,
+          familyMembers: prev.familyMembers.map(member => 
+            member._id === editFamilyMember._id ? response.data.updatedMember : member
+          )
+        }));
+        setEditFamilyMember(null);
+        setFamilyForm({ name: '', relation: '', gender: '' });
+        setError('');
+      } else {
+        setError(response.data.message || 'Failed to update family member');
+      }
     } catch (error) {
-      console.error('Remove family error:', error);
-      toast.error(error.response?.data?.message || 'Failed to remove family member');
+      console.error('Update family member error:', error);
+      setError(error.response?.data?.message || 'Network error. Please try again.');
     }
   };
 
-  const displayGender = (genderValue) => {
-    if (!genderValue) return '-';
-    return genderValue.charAt(0).toUpperCase() + genderValue.slice(1);
+  const removeFamilyMember = async (memberId) => {
+    if (!window.confirm('Are you sure you want to remove this family member?')) return;
+
+    try {
+      const response = await axios.delete(`${API_BASE_URL}/profile/family/${memberId}`);
+      
+      if (response.data.success) {
+        setUser(prev => ({
+          ...prev,
+          familyMembers: prev.familyMembers.filter(member => member._id !== memberId)
+        }));
+        setError('');
+      } else {
+        setError(response.data.message || 'Failed to remove family member');
+      }
+    } catch (error) {
+      console.error('Remove family member error:', error);
+      setError(error.response?.data?.message || 'Network error. Please try again.');
+    }
+  };
+
+  const handleProfileChange = (e) => {
+    setProfileForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const handleFamilyChange = (e) => {
+    setFamilyForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        setError('File size should be less than 5MB');
+        return;
+      }
+      
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+      if (!allowedTypes.includes(file.type)) {
+        setError('Only JPEG, JPG, and PNG files are allowed');
+        return;
+      }
+      
+      updateProfilePicture(file);
+    }
+  };
+
+  const startEditingFamilyMember = (member) => {
+    setEditFamilyMember(member);
+    setFamilyForm({
+      name: member.name,
+      relation: member.relation,
+      gender: member.gender || ''
+    });
+  };
+
+  const cancelEditing = () => {
+    setEditMode(false);
+    setEditFamilyMember(null);
+    setShowAddFamily(false);
+    setFamilyForm({ name: '', relation: '', gender: '' });
+    setError('');
+    if (user) {
+      setProfileForm({
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        flat_no: user.flat_no
+      });
+    }
+  };
+
+  const getProfilePictureUrl = (picturePath) => {
+    if (!picturePath) return null;
+    
+    if (picturePath.startsWith('http')) {
+      return picturePath;
+    }
+    
+    const cleanPath = picturePath.startsWith('/') ? picturePath.slice(1) : picturePath;
+    return `http://localhost:5000/${cleanPath}`;
   };
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <div className="animate-pulse flex flex-col items-center gap-4">
-          <div className="w-20 h-20 bg-gray-200 rounded-full"></div>
-          <div className="h-6 bg-gray-200 rounded w-48"></div>
-          <div className="h-4 bg-gray-200 rounded w-64"></div>
-        </div>
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
       </div>
     );
   }
 
   if (!user) {
     return (
-      <div className="flex flex-col justify-center items-center h-screen gap-4">
-        <div className="text-xl font-semibold text-red-600">Failed to load profile data</div>
-        <button
-          onClick={fetchProfile}
-          className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition flex items-center gap-2"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
-          </svg>
-          Try Again
-        </button>
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="text-center p-6 bg-white rounded-lg shadow-md">
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Profile not found</h2>
+          <p className="text-gray-600">Unable to load profile information.</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         {/* Profile Header */}
-        <div className="bg-white rounded-xl shadow-md overflow-hidden mb-8">
-          <div className="p-6 sm:p-8">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">My Profile</h1>
-                <p className="text-gray-600">Manage your personal information and family members</p>
-              </div>
-              {!editMode ? (
-                <button
-                  onClick={() => setEditMode(true)}
-                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition duration-200 ease-in-out transform hover:-translate-y-0.5"
-                >
-                  <Edit2 size={18} /> Edit Profile
-                </button>
-              ) : (
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      setEditMode(false);
-                      fetchProfile(); // Reset form with original data
-                    }}
-                    className="flex items-center gap-2 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition"
-                  >
-                    <X size={18} /> Cancel
-                  </button>
-                  <button
-                    onClick={handleSubmit}
-                    className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition duration-200 ease-in-out transform hover:-translate-y-0.5"
-                  >
-                    <Save size={18} /> Save Changes
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Profile Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-8">
+          <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-8 sm:px-8 sm:py-10">
+            <div className="flex flex-col sm:flex-row items-center space-y-6 sm:space-y-0 sm:space-x-8">
               {/* Profile Picture */}
-              <div className="flex flex-col items-center">
-                <div className="relative mb-4 group">
-                  {previewPic ? (
+              <div className="relative">
+                <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-white p-1 shadow-md">
+                  {user.profilePicture ? (
                     <img
-                      src={previewPic}
+                      src={getProfilePictureUrl(user.profilePicture)}
                       alt="Profile"
-                      className="w-40 h-40 rounded-full object-cover border-4 border-blue-100 shadow-md transition duration-300 group-hover:opacity-90"
+                      className="w-full h-full rounded-full object-cover"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        e.target.nextSibling.style.display = 'flex';
+                      }}
                     />
-                  ) : (
-                    <div className="w-40 h-40 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center border-4 border-blue-100 shadow-md">
-                      <User size={60} className="text-gray-400" />
-                    </div>
-                  )}
-                  <label
-                    htmlFor="profilePicture"
-                    className="absolute bottom-2 right-2 bg-blue-600 text-white p-2 rounded-full cursor-pointer hover:bg-blue-700 transition shadow-lg transform transition duration-200 hover:scale-110"
+                  ) : null}
+                  <div 
+                    className="w-full h-full rounded-full bg-blue-100 flex items-center justify-center" 
+                    style={{ display: user.profilePicture ? 'none' : 'flex' }}
                   >
-                    <Camera size={20} />
-                    <input
-                      id="profilePicture"
-                      type="file"
-                      accept="image/jpeg,image/png,image/jpg"
-                      className="hidden"
-                      onChange={handleFileChange}
-                    />
-                  </label>
-                </div>
-                {profilePic && (
-                  <button
-                    onClick={uploadProfilePicture}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition flex items-center gap-2"
-                  >
-                    <Save size={16} /> Upload Photo
-                  </button>
-                )}
-
-                {/* Permanent ID Badge */}
-                <div className="mt-6 flex items-center gap-2 bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 rounded-lg border border-blue-100 w-full max-w-xs">
-                  <Badge className="text-blue-600" size={20} />
-                  <div>
-                    <p className="text-xs text-blue-500">Permanent ID</p>
-                    <p className="font-medium text-blue-800">
-                      {user.permanentId || 'Pending Approval'}
-                    </p>
+                    <User className="w-14 h-14 text-blue-500" />
                   </div>
                 </div>
+                <label className={`absolute bottom-2 right-2 bg-white rounded-full p-2 cursor-pointer hover:bg-gray-100 transition-colors shadow-md ${uploadingPicture ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                  {uploadingPicture ? (
+                    <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    <Camera className="w-4 h-4 text-blue-600" />
+                  )}
+                  <input 
+                    type="file" 
+                    accept="image/jpeg,image/jpg,image/png" 
+                    onChange={handleFileUpload} 
+                    className="hidden" 
+                    disabled={uploadingPicture}
+                  />
+                </label>
               </div>
 
-              {/* Profile Form */}
-              <div className="lg:col-span-2">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-1">
-                    <label className="block text-sm font-medium text-gray-700">Full Name *</label>
-                    {editMode ? (
-                      <input
-                        name="name"
-                        value={formData.name}
-                        onChange={handleInputChange}
-                        type="text"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                        required
-                      />
-                    ) : (
-                      <div className="px-4 py-2 bg-gray-50 rounded-lg border border-gray-200">{user.name || 'Not provided'}</div>
-                    )}
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="block text-sm font-medium text-gray-700">Email *</label>
-                    {editMode ? (
-                      <input
-                        name="email"
-                        value={formData.email}
-                        onChange={handleInputChange}
-                        type="email"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                        required
-                      />
-                    ) : (
-                      <div className="px-4 py-2 bg-gray-50 rounded-lg border border-gray-200">{user.email || 'Not provided'}</div>
-                    )}
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="block text-sm font-medium text-gray-700">Phone Number *</label>
-                    {editMode ? (
-                      <input
-                        name="phone"
-                        value={formData.phone}
-                        onChange={handleInputChange}
-                        type="tel"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                        required
-                      />
-                    ) : (
-                      <div className="px-4 py-2 bg-gray-50 rounded-lg border border-gray-200">{user.phone || 'Not provided'}</div>
-                    )}
-                  </div>
-
-                  {user.role === 'resident' && (
-                    <div className="space-y-1">
-                      <label className="block text-sm font-medium text-gray-700">Flat Number *</label>
-                      {editMode ? (
-                        <input
-                          name="flat_no"
-                          value={formData.flat_no}
-                          onChange={handleInputChange}
-                          type="text"
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                          required
-                        />
-                      ) : (
-                        <div className="px-4 py-2 bg-gray-50 rounded-lg border border-gray-200">{user.flat_no || 'Not provided'}</div>
-                      )}
-                    </div>
+              {/* User Info */}
+              <div className="text-white text-center sm:text-left">
+                <h1 className="text-2xl sm:text-3xl font-bold">{user.name}</h1>
+                <p className="text-blue-100 text-lg capitalize">{user.role}</p>
+                <div className="mt-3 flex flex-wrap justify-center sm:justify-start gap-2">
+                  <span className="bg-blue-400 bg-opacity-20 px-3 py-1 rounded-full text-sm">
+                    PID: {user.permanentId}
+                  </span>
+                  {user.flat_no && (
+                    <span className="bg-blue-400 bg-opacity-20 px-3 py-1 rounded-full text-sm">
+                      Flat: {user.flat_no}
+                    </span>
                   )}
                 </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Family Members Section */}
-        <div className="bg-white rounded-xl shadow-md overflow-hidden">
+          {/* Error Message */}
+          {error && (
+            <div className="mx-6 mt-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-r-lg">
+              <div className="flex justify-between items-start">
+                <p className="text-red-800 text-sm">{error}</p>
+                <button 
+                  onClick={() => setError('')}
+                  className="text-red-600 hover:text-red-800 text-sm"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Profile Details */}
           <div className="p-6 sm:p-8">
-            <h2 className="text-xl font-bold text-gray-900 mb-6">Family Members</h2>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4 sm:mb-0">Profile Information</h2>
+              <button
+                onClick={() => editMode ? updateProfile() : setEditMode(true)}
+                className="flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+              >
+                {editMode ? <Save className="w-4 h-4" /> : <Edit className="w-4 h-4" />}
+                <span>{editMode ? 'Save Changes' : 'Edit Profile'}</span>
+              </button>
+            </div>
 
-            {/* Add Family Member */}
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-xl mb-8 border border-blue-100">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Add New Family Member</h3>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Name */}
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">Name</label>
+                {editMode ? (
                   <input
                     type="text"
-                    value={newFamilyMember.name}
-                    onChange={(e) => setNewFamilyMember({ ...newFamilyMember, name: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                    placeholder="Full Name"
-                    minLength={2}
+                    name="name"
+                    value={profileForm.name}
+                    onChange={handleProfileChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
                     required
                   />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Relation *</label>
-                  <select
-                    value={newFamilyMember.relation}
-                    onChange={(e) => setNewFamilyMember({ ...newFamilyMember, relation: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                    required
-                  >
-                    <option value="">Select Relation</option>
-                    <option value="spouse">Spouse</option>
-                    <option value="child">Child</option>
-                    <option value="parent">Parent</option>
-                    <option value="sibling">Sibling</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Gender *</label>
-                  <select
-                    value={newFamilyMember.gender}
-                    onChange={(e) => setNewFamilyMember({ ...newFamilyMember, gender: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                    required
-                  >
-                    <option value="">Select Gender</option>
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Profile Picture</label>
-                  <div className="flex items-center gap-3">
-                    <label className="cursor-pointer group">
-                      <div className="w-12 h-12 rounded-full bg-white border-2 border-dashed border-gray-300 flex items-center justify-center group-hover:border-blue-500 transition">
-                        {familyMemberPreview ? (
-                          <img
-                            src={familyMemberPreview}
-                            alt="Preview"
-                            className="w-full h-full rounded-full object-cover"
-                          />
-                        ) : (
-                          <Camera size={18} className="text-gray-400 group-hover:text-blue-500 transition" />
-                        )}
-                      </div>
-                      <input
-                        type="file"
-                        accept="image/jpeg,image/png,image/jpg"
-                        className="hidden"
-                        onChange={handleFamilyMemberFileChange}
-                      />
-                    </label>
-                    <button
-                      onClick={handleAddFamilyMember}
-                      disabled={!newFamilyMember.name || !newFamilyMember.relation || !newFamilyMember.gender}
-                      className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition disabled:bg-gray-400 disabled:cursor-not-allowed"
-                    >
-                      <Plus size={18} /> Add Member
-                    </button>
+                ) : (
+                  <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <User className="w-5 h-5 text-gray-500" />
+                    <span className="text-gray-800">{user.name}</span>
                   </div>
-                </div>
+                )}
+              </div>
+
+              {/* Email */}
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">Email</label>
+                {editMode ? (
+                  <input
+                    type="email"
+                    name="email"
+                    value={profileForm.email}
+                    onChange={handleProfileChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                  />
+                ) : (
+                  <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <Mail className="w-5 h-5 text-gray-500" />
+                    <span className="text-gray-800">{user.email || 'Not provided'}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Phone */}
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">Phone</label>
+                {editMode ? (
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={profileForm.phone}
+                    onChange={handleProfileChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                  />
+                ) : (
+                  <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <Phone className="w-5 h-5 text-gray-500" />
+                    <span className="text-gray-800">{user.phone || 'Not provided'}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Flat Number */}
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">Flat Number</label>
+                {editMode ? (
+                  <input
+                    type="text"
+                    name="flat_no"
+                    value={profileForm.flat_no}
+                    onChange={handleProfileChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                  />
+                ) : (
+                  <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <Home className="w-5 h-5 text-gray-500" />
+                    <span className="text-gray-800">{user.flat_no || 'Not provided'}</span>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Family Members List */}
-            {user.familyMembers?.length > 0 ? (
-              <div className="overflow-hidden rounded-xl border border-gray-200">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Photo</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Relation</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gender</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Permanent ID</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {user.familyMembers.map((member) => (
-                      <tr key={member._id} className="hover:bg-gray-50 transition">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="flex-shrink-0 h-10 w-10">
-                              {familyEditId === member._id ? (
-                                <label className="cursor-pointer">
-                                  <div className="relative h-10 w-10 rounded-full bg-gray-100 overflow-hidden">
-                                    {familyMemberPreview ? (
-                                      <img
-                                        src={familyMemberPreview}
-                                        alt="Preview"
-                                        className="h-full w-full object-cover"
-                                      />
-                                    ) : member.profilePicture ? (
-                                      <img
-                                        src={getImageUrl(member.profilePicture)}
-                                        alt="Member"
-                                        className="h-full w-full object-cover"
-                                      />
-                                    ) : (
-                                      <div className="h-full w-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center">
-                                        <User size={16} className="text-gray-500" />
-                                      </div>
-                                    )}
-                                    <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center opacity-0 hover:opacity-100 transition">
-                                      <Camera size={16} className="text-white" />
-                                    </div>
-                                  </div>
-                                  <input
-                                    type="file"
-                                    accept="image/jpeg,image/png,image/jpg"
-                                    className="hidden"
-                                    onChange={handleFamilyMemberFileChange}
-                                  />
-                                </label>
-                              ) : (
-                                <div className="h-10 w-10 rounded-full bg-gray-100 overflow-hidden">
-                                  {member.profilePicture ? (
-                                    <img
-                                      src={getImageUrl(member.profilePicture)}
-                                      alt="Member"
-                                      className="h-full w-full object-cover"
-                                    />
-                                  ) : (
-                                    <div className="h-full w-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center">
-                                      <User size={16} className="text-gray-500" />
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {familyEditId === member._id ? (
-                            <input
-                              type="text"
-                              value={member.name || ''}
-                              onChange={(e) => {
-                                const updatedMembers = user.familyMembers.map(m =>
-                                  m._id === member._id ? { ...m, name: e.target.value } : m
-                                );
-                                setUser({ ...user, familyMembers: updatedMembers });
-                              }}
-                              className="w-full px-3 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              required
-                              minLength={2}
-                            />
-                          ) : (
-                            <div className="text-sm font-medium text-gray-900">{member.name || '-'}</div>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {familyEditId === member._id ? (
-                            <select
-                              value={member.relation || ''}
-                              onChange={(e) => {
-                                const updatedMembers = user.familyMembers.map(m =>
-                                  m._id === member._id ? { ...m, relation: e.target.value } : m
-                                );
-                                setUser({ ...user, familyMembers: updatedMembers });
-                              }}
-                              className="w-full px-3 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              required
-                            >
-                              <option value="spouse">Spouse</option>
-                              <option value="child">Child</option>
-                              <option value="parent">Parent</option>
-                              <option value="sibling">Sibling</option>
-                              <option value="other">Other</option>
-                            </select>
-                          ) : (
-                            <div className="text-sm text-gray-500">{member.relation || '-'}</div>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {familyEditId === member._id ? (
-                            <select
-                              value={member.gender || ''}
-                              onChange={(e) => {
-                                const updatedMembers = user.familyMembers.map(m =>
-                                  m._id === member._id ? { ...m, gender: e.target.value } : m
-                                );
-                                setUser({ ...user, familyMembers: updatedMembers });
-                              }}
-                              className="w-full px-3 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              required
-                            >
-                              <option value="male">Male</option>
-                              <option value="female">Female</option>
-                              <option value="other">Other</option>
-                            </select>
-                          ) : (
-                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                              ${member.gender === 'male' ? 'bg-blue-100 text-blue-800' :
-                                member.gender === 'female' ? 'bg-pink-100 text-pink-800' :
-                                  'bg-purple-100 text-purple-800'}`}>
-                              {displayGender(member.gender) || '-'}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-2">
-                            <Badge size={16} className="text-blue-600" />
-                            <span className="text-sm font-mono text-gray-600">
-                              {member.permanentId || `${user.permanentId}-${member.relation?.toLowerCase() || 'member'}`}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <div className="flex gap-3">
-                            {familyEditId === member._id ? (
-                              <>
-                                <button
-                                  onClick={() => handleUpdateFamilyMember(member._id)}
-                                  className="text-green-600 hover:text-green-900 transition"
-                                  title="Save changes"
-                                >
-                                  <Save size={18} />
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setFamilyEditId(null);
-                                    setFamilyMemberPic(null);
-                                    setFamilyMemberPreview('');
-                                  }}
-                                  className="text-gray-600 hover:text-gray-900 transition"
-                                  title="Cancel"
-                                >
-                                  <X size={18} />
-                                </button>
-                              </>
-                            ) : (
-                              <>
-                                <button
-                                  onClick={() => {
-                                    setFamilyEditId(member._id);
-                                    setFamilyMemberPreview(
-                                      member.profilePicture ? getImageUrl(member.profilePicture) : ''
-                                    );
-                                  }}
-                                  className="text-blue-600 hover:text-blue-900 transition"
-                                  title="Edit member"
-                                >
-                                  <Edit2 size={18} />
-                                </button>
-                                <button
-                                  onClick={() => handleRemoveFamilyMember(member._id)}
-                                  className="text-red-600 hover:text-red-900 transition"
-                                  title="Remove member"
-                                >
-                                  <Trash2 size={18} />
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            {/* Action Buttons */}
+            {editMode && (
+              <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 mt-8">
+                <button
+                  onClick={updateProfile}
+                  className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Save Changes</span>
+                </button>
+                <button
+                  onClick={cancelEditing}
+                  className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors shadow-sm"
+                >
+                  <X className="w-4 h-4" />
+                  <span>Cancel</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Family Members Section */}
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="p-6 sm:p-8 border-b border-gray-200">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-800 flex items-center space-x-2 mb-4 sm:mb-0">
+                <Users className="w-6 h-6 text-blue-600" />
+                <span>Family Members</span>
+              </h2>
+              <button
+                onClick={() => setShowAddFamily(true)}
+                className="flex items-center justify-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Member</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Family Members List */}
+          <div className="p-6 sm:p-8">
+            {user.familyMembers && user.familyMembers.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {user.familyMembers.map((member) => (
+                  <div key={member._id} className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:border-blue-300 transition-colors">
+                    <div className="flex items-start justify-between mb-3">
+                      <h3 className="font-semibold text-gray-800 text-lg">{member.name}</h3>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => startEditingFamilyMember(member)}
+                          className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50 transition-colors"
+                          title="Edit"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => removeFamilyMember(member._id)}
+                          className="text-red-600 hover:text-red-800 p-1 rounded-full hover:bg-red-50 transition-colors"
+                          title="Remove"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-sm text-gray-700">
+                        <span className="font-medium">Relation:</span> {member.relation}
+                      </p>
+                      {member.gender && (
+                        <p className="text-sm text-gray-700">
+                          <span className="font-medium">Gender:</span> {member.gender}
+                        </p>
+                      )}
+                      <p className="text-xs text-gray-500 mt-2">
+                        PID: {member.permanentId || user.permanentId}
+                      </p>
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : (
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-8 rounded-xl border border-dashed border-blue-200 text-center">
-                <User size={48} className="mx-auto text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-1">No family members added</h3>
-                <p className="text-gray-500 mb-4">Add your family members to manage them together</p>
+              <div className="text-center py-12">
+                <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                  <Users className="w-8 h-8 text-gray-400" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-700 mb-1">No family members</h3>
+                <p className="text-gray-500">Add family members to your profile</p>
+                <button
+                  onClick={() => setShowAddFamily(true)}
+                  className="mt-4 inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Family Member
+                </button>
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Add/Edit Family Member Modal */}
+      {(showAddFamily || editFamilyMember) && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-md overflow-hidden shadow-xl">
+            <div className="p-6 border-b border-gray-200">
+              <h3 className="text-lg font-bold text-gray-900">
+                {editFamilyMember ? 'Edit Family Member' : 'Add Family Member'}
+              </h3>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Name *</label>
+                <input
+                  type="text"
+                  name="name"
+                  value={familyForm.name}
+                  onChange={handleFamilyChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                  placeholder="Enter full name"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Relation *</label>
+                <select
+                  name="relation"
+                  value={familyForm.relation}
+                  onChange={handleFamilyChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                  required
+                >
+                  <option value="">Select relation</option>
+                  <option value="Father">Father</option>
+                  <option value="Mother">Mother</option>
+                  <option value="Spouse">Spouse</option>
+                  <option value="Son">Son</option>
+                  <option value="Daughter">Daughter</option>
+                  <option value="Brother">Brother</option>
+                  <option value="Sister">Sister</option>
+                  <option value="Grandfather">Grandfather</option>
+                  <option value="Grandmother">Grandmother</option>
+                  <option value="Uncle">Uncle</option>
+                  <option value="Aunt">Aunt</option>
+                  <option value="Cousin">Cousin</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Gender</label>
+                <select
+                  name="gender"
+                  value={familyForm.gender}
+                  onChange={handleFamilyChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                >
+                  <option value="">Select gender</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+            </div>
+            
+            <div className="p-6 bg-gray-50 flex space-x-3">
+              <button
+                onClick={editFamilyMember ? updateFamilyMember : addFamilyMember}
+                disabled={!familyForm.name.trim() || !familyForm.relation.trim()}
+                className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed shadow-sm"
+              >
+                {editFamilyMember ? 'Update' : 'Add'} Member
+              </button>
+              <button
+                onClick={cancelEditing}
+                className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors shadow-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-export default ProfileEdit;
+export default ResidentProfileManager;

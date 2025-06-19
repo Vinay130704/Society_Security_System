@@ -32,6 +32,7 @@ const profileRoutes = require("./routes/profileRoutes");
 const app = express();
 const server = http.createServer(app);
 
+
 // Helper function to get server base URL
 const getServerBaseUrl = (req) => {
   return `${req.protocol}://${req.get("host")}`;
@@ -40,7 +41,7 @@ const getServerBaseUrl = (req) => {
 // Middleware setup
 app.use(
   cors({
-    origin: "http://localhost:5173", // Frontend URL (update for production)
+    origin: process.env.FRONTEND_URL || "http://localhost:5173", // Frontend URL (update for production)
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,

@@ -8,6 +8,7 @@ import StaffEntryExit from "../pages/Security/Staff-Worker";
 import VehicleEntryExit from "../pages/Security/VehicleEntryExit";
 import SecurityProfile from "../pages/Security/SecurityProfile";
 import SecurityAlertsDashboard from "../pages/Security/Emergencyhandle";
+import SecurityDeliveryManagement from "../pages/Security/ScanDelivery";
 
 const SecurityRoutes = () => {
   return (
@@ -20,6 +21,8 @@ const SecurityRoutes = () => {
         <Route path="vehicle-record" element={<VehicleEntryExit />} />
         <Route path="profile" element={<SecurityProfile />} />
         <Route path="emergency" element={<SecurityAlertsDashboard />} />
+        <Route path="delivery" element={<SecurityDeliveryManagement />} />
+
 
       </Route>
     </Routes>

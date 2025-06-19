@@ -10,7 +10,7 @@ router.post("/picture", authMiddleware, updateProfilePicture);
 
 // Family member routes
 router.post('/add-familymember', authMiddleware, addFamilyMember);
-router.post("/edit-family", authMiddleware, updateFamilyMember);
+router.put("/edit-family", authMiddleware, updateFamilyMember);
 router.delete("/family/:memberId", authMiddleware, removeFamilyMember);
 
 // Entry/Exit log routes

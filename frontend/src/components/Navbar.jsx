@@ -1,13 +1,14 @@
 import { useState, useRef, useEffect } from "react";
-import { Link, NavLink } from "react-router-dom";
-import { Menu, X, User, LogOut, Shield, Settings, Bell, Key } from "lucide-react";
+import { Link, NavLink, useNavigate } from "react-router-dom";
+import { Menu, X, User, LogOut, Shield, Key } from "lucide-react";
 import { useAuth } from "../Context/AuthContext";
 
 const Navbar = () => {
-  const { isLoggedIn, LogoutUser, user } = useAuth();
+  const { isLoggedIn, logoutUser, user } = useAuth(); // Changed from LogoutUser to logoutUser
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -22,6 +23,16 @@ const Navbar = () => {
     };
   }, []);
 
+  const handleLogout = async () => {
+    try {
+      await logoutUser(); // Changed from LogoutUser to logoutUser
+      setIsProfileDropdownOpen(false);
+      setIsMobileMenuOpen(false);
+      navigate("/");
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
   return (
     <nav className="bg-gradient-to-r from-primary to-primary-dark text-white fixed w-full top-0 left-0 shadow-lg z-50 border-b border-primary-light/20 h-16">
       <div className="container mx-auto px-4 sm:px-6 py-3 flex justify-between items-center h-full">
@@ -61,16 +72,13 @@ const Navbar = () => {
                     </div>
                     <span className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-primary-dark"></span>
                   </div>
-                  <span className="text-sm font-medium text-gray-200">{user?.name }</span>
+                  <span className="text-sm font-medium text-gray-200">{user?.name}</span>
                 </button>
 
                 {isProfileDropdownOpen && (
                   <div className="absolute right-0 mt-2 w-56 bg-primary-dark/95 backdrop-blur-sm rounded-lg shadow-xl py-1 z-50 border border-primary-light/50">
                     <button
-                      onClick={() => {
-                        LogoutUser();
-                        setIsProfileDropdownOpen(false);
-                      }}
+                      onClick={handleLogout}
                       className="w-full text-left flex items-center px-4 py-3 text-sm text-red-300 hover:bg-primary-light/50 hover:text-red-200 transition-colors"
                     >
                       <LogOut className="h-4 w-4 mr-3" /> Logout
@@ -80,7 +88,7 @@ const Navbar = () => {
                       className="flex items-center px-4 py-3 text-sm text-gray-300 hover:bg-primary-light/50 transition-colors border-t border-primary-light/50"
                       onClick={() => setIsProfileDropdownOpen(false)}
                     >
-                      <Key className="h-4 w-4 mr-3" /> Forgot Password
+                      <Key className="h-4 w-4 mr-3" /> Reset Password
                     </Link>
                   </div>
                 )}
@@ -95,7 +103,7 @@ const Navbar = () => {
                 Login
               </NavLink>
               <NavLink
-                to="/register"
+                to="/resident-register"
                 className="px-4 py-2 rounded-md text-sm font-medium bg-secondary hover:bg-secondary-dark text-white transition-colors"
               >
                 Get Started
@@ -139,10 +147,7 @@ const Navbar = () => {
             {isLoggedIn ? (
               <div className="border-t border-primary-light/50 pt-4 mt-2 flex flex-col space-y-3">
                 <button
-                  onClick={() => {
-                    LogoutUser();
-                    setIsMobileMenuOpen(false);
-                  }}
+                  onClick={handleLogout}
                   className="w-full text-center px-4 py-2 rounded-md text-base font-medium text-red-300 hover:text-red-200 hover:bg-primary-light/30"
                 >
                   Logout
@@ -152,7 +157,7 @@ const Navbar = () => {
                   className="w-full text-center px-4 py-2 rounded-md text-base font-medium text-gray-200 hover:text-white hover:bg-primary-light/30"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
-                  Forgot Password
+                  Reset Password
                 </NavLink>
               </div>
             ) : (
@@ -165,7 +170,7 @@ const Navbar = () => {
                   Login
                 </NavLink>
                 <NavLink
-                  to="/register"
+                  to="/resident-register"
                   className="w-full text-center px-4 py-2 rounded-md text-base font-medium bg-secondary hover:bg-secondary-dark text-white"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >

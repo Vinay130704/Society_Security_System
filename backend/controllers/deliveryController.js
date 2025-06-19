@@ -40,7 +40,7 @@ const createDeliveryRequest = async (req, res) => {
     }
 
     // Check if a pending request already exists
-    let existingDelivery = await DeliveryRequest.findOne({
+    const existingDelivery = await DeliveryRequest.findOne({
       residentId,
       status: "pending",
     });
@@ -68,6 +68,7 @@ const createDeliveryRequest = async (req, res) => {
       expectedTime,
       uniqueId,
       status: "pending",
+      entryTime: null
     });
 
     await newDelivery.save();
@@ -93,47 +94,54 @@ const createDeliveryRequest = async (req, res) => {
   }
 };
 
-// Scan Unique ID (Only Security Guards)
-const scanUniqueId = async (req, res) => {
+
+
+// Get Delivery Logs
+const getDeliveryLogs = async (req, res) => {
   try {
-    if (!req.user) {
-      return res.status(401).json({ error: "User authentication failed" });
+    const { deliveryId } = req.params;
+    
+    if (!mongoose.Types.ObjectId.isValid(deliveryId)) {
+      return res.status(400).json({ error: "Invalid deliveryId format" });
     }
 
-    if (req.user.role !== "security") {
-      return res.status(403).json({ error: "Unauthorized: Only security guards can scan codes" });
-    }
-
-    const { uniqueId } = req.body;
-
-    const delivery = await DeliveryRequest.findOne({ uniqueId });
+    const delivery = await DeliveryRequest.findById(deliveryId);
 
     if (!delivery) {
-      return res.status(404).json({ error: "Invalid or expired delivery code" });
+      return res.status(404).json({ error: "Delivery request not found" });
     }
 
-    if (delivery.status === "completed") {
-      return res.status(400).json({ error: "Delivery code already used" });
-    }
-
-    delivery.status = "completed";
-    delivery.entryTime = new Date();
-    await delivery.save();
-
-    // Find resident's phone number
-    const resident = await User.findById(delivery.residentId);
-    if (resident && resident.phone) {
-      const residentMessage = `Your delivery from ${delivery.deliveryCompany} has been completed at ${new Date().toLocaleString()}`;
-      try {
-        await sendSMS(resident.phone, residentMessage);
-      } catch (smsError) {
-        console.error("Failed to send SMS to resident:", smsError);
+    // Construct log history
+    const logHistory = [
+      {
+        action: 'created',
+        time: delivery.createdAt,
+        description: 'Delivery request created'
       }
+    ];
+
+    if (delivery.entryTime) {
+      logHistory.push({
+        action: 'entry',
+        time: delivery.entryTime,
+        description: 'Delivery person entered premises'
+      });
     }
 
-    res.status(200).json({ message: "Delivery code verified successfully", delivery });
+    if (delivery.status === 'completed') {
+      logHistory.push({
+        action: 'completed',
+        time: delivery.updatedAt,
+        description: 'Delivery completed'
+      });
+    }
+
+    res.status(200).json({
+      message: "Delivery logs retrieved successfully",
+      logHistory
+    });
   } catch (error) {
-    console.error("Error verifying delivery code:", error);
+    console.error("Error retrieving delivery logs:", error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -188,10 +196,6 @@ const editDeliveryDetails = async (req, res) => {
 
     if (!delivery) {
       return res.status(404).json({ error: "Delivery request not found" });
-    }
-
-    if (new Date(delivery.expectedTime) < new Date()) {
-      return res.status(403).json({ error: "Cannot edit: Delivery time has passed" });
     }
 
     // Validate and format phone number if provided
@@ -254,10 +258,6 @@ const deleteDeliveryRequest = async (req, res) => {
       return res.status(404).json({ error: "Delivery request not found" });
     }
 
-    if (new Date(delivery.expectedTime) < new Date()) {
-      return res.status(403).json({ error: "Cannot delete: Delivery time has passed" });
-    }
-
     // Fetch resident details for SMS
     const resident = await User.findById(delivery.residentId);
     if (!resident || !resident.name || !resident.flat_no) {
@@ -285,11 +285,14 @@ const deleteDeliveryRequest = async (req, res) => {
 // Get All Delivery Requests
 const getAllDeliveryRequests = async (req, res) => {
   try {
-    const { status } = req.query;
+    const { status, residentId } = req.query;
 
     let query = {};
     if (status) {
       query.status = status;
+    }
+    if (residentId && mongoose.Types.ObjectId.isValid(residentId)) {
+      query.residentId = new mongoose.Types.ObjectId(residentId);
     }
 
     const deliveries = await DeliveryRequest.find(query).sort({ createdAt: -1 });
@@ -308,11 +311,100 @@ const getAllDeliveryRequests = async (req, res) => {
   }
 };
 
+// Scan Unique ID (Security Guard Only)
+const scanUniqueId = async (req, res) => {
+  try {
+    const { uniqueId } = req.body;
+    const userRole = req.user.role;
+
+    if (userRole !== "security") {
+      return res.status(403).json({ error: "Unauthorized: Only security guards can scan delivery IDs" });
+    }
+
+    if (!uniqueId) {
+      return res.status(400).json({ error: "Unique ID is required" });
+    }
+
+    const delivery = await DeliveryRequest.findOne({ uniqueId });
+
+    if (!delivery) {
+      return res.status(404).json({ error: "Delivery request not found" });
+    }
+
+    // Check if delivery is already completed
+    if (delivery.status === "completed") {
+      return res.status(400).json({ error: "This delivery has already been completed" });
+    }
+
+    // Record entry or exit based on current status
+    let update = {};
+    let message = "";
+    
+    if (!delivery.entryTime) {
+      // First scan - record entry
+      update = { 
+        entryTime: new Date(),
+        status: "approved" 
+      };
+      message = "Delivery person entry recorded successfully";
+      
+      // Fetch resident details for notification
+      const resident = await User.findById(delivery.residentId);
+      if (resident && resident.phone) {
+        try {
+          const entryTimeFormatted = formatDateForSMS(new Date());
+          const smsMessage = `GuardianNet: Your delivery person ${delivery.deliveryPersonName} from ${delivery.deliveryCompany} has entered the premises at ${entryTimeFormatted}.`;
+          await sendSMS(resident.phone, smsMessage);
+        } catch (smsError) {
+          console.error("Failed to send entry notification to resident:", smsError);
+        }
+      }
+    } else {
+      // Second scan - record completion
+      update = { 
+        exitTime: new Date(),
+        status: "completed",
+        completedAt: new Date()
+      };
+      message = "Delivery completed and exit recorded successfully";
+      
+      // Fetch resident details for notification
+      const resident = await User.findById(delivery.residentId);
+      if (resident && resident.phone) {
+        try {
+          const exitTimeFormatted = formatDateForSMS(new Date());
+          const smsMessage = `GuardianNet: Your delivery from ${delivery.deliveryCompany} has been completed at ${exitTimeFormatted}.`;
+          await sendSMS(resident.phone, smsMessage);
+        } catch (smsError) {
+          console.error("Failed to send completion notification to resident:", smsError);
+        }
+      }
+    }
+
+    const updatedDelivery = await DeliveryRequest.findByIdAndUpdate(
+      delivery._id,
+      update,
+      { new: true }
+    );
+
+    res.status(200).json({
+      message,
+      delivery: updatedDelivery
+    });
+
+  } catch (error) {
+    console.error("Error scanning unique ID:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+
 module.exports = {
   createDeliveryRequest,
-  scanUniqueId,
+scanUniqueId,
   getDeliveryRequestById,
   editDeliveryDetails,
   deleteDeliveryRequest,
   getAllDeliveryRequests,
+  getDeliveryLogs
 };

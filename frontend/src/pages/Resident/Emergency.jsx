@@ -44,11 +44,7 @@ const EmergencyAlert = () => {
       const promise = axios.get('http://localhost:5000/api/profile/get-profile', getAuthHeaders());
       const response = await toast.promise(
         promise,
-        {
-          pending: 'Loading resident profile...',
-          success: 'Profile loaded',
-          error: 'Failed to load resident information'
-        },
+        
         { toastId: 'fetch-profile' }
       );
 

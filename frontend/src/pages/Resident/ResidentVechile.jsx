@@ -383,20 +383,7 @@ const ResidentVehicleManagement = () => {
               </p>
             </div>
             <div className="flex gap-3">
-              <button
-                onClick={() => navigate("/dashboard")}
-                className="flex items-center gap-2 bg-blue-100 hover:bg-blue-200 text-blue-800 px-4 py-2 rounded-lg transition"
-              >
-                <User size={18} /> Back to Dashboard
-              </button>
-              <button
-                onClick={refreshData}
-                disabled={loading}
-                className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg transition disabled:opacity-50"
-              >
-                <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
-                Refresh
-              </button>
+            
             </div>
           </div>
         </div>

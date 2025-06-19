@@ -17,8 +17,6 @@ const entryLogSchema = new mongoose.Schema({
   },
   method: {
     type: String,
-    enum: ["manual", "rfid", "qr", "face"],
-    default: "manual"
   },
   verifiedBy: {
     type: mongoose.Schema.Types.ObjectId,

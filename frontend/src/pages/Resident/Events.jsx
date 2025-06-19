@@ -5,7 +5,7 @@ import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import {
   Calendar, MapPin, Clock, User, AlertCircle,
-  ChevronLeft, ChevronRight, X
+  ChevronLeft, ChevronRight, X, Search
 } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -19,6 +19,7 @@ const EventsPage = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDate, setFilterDate] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
   const API_BASE_URL = 'http://localhost:5000/api/event';
@@ -38,70 +39,62 @@ const EventsPage = () => {
     };
   };
 
-  const fetchEvents = async () => {
-    try {
-      setError(null);
-      const past = filter === 'past' ? 'true' : 'false';
-      const promise = axios.get(
-        `${API_BASE_URL}/view-event`,
-        {
-          ...getAuthHeaders(),
-          params: {
-            past,
-            page: currentPage,
-            limit: 6
-          }
-        }
-      );
+const fetchEvents = async () => {
+  try {
+    setIsLoading(true);
+    setError(null);
 
-      const response = await toast.promise(
-        promise,
-        {
-          pending: 'Loading events...',
-          success: 'Events loaded successfully',
-          error: {
-            render({ data }) {
-              return data.response?.data?.message || 'Failed to load events';
-            }
-          }
-        },
-        { toastId: 'fetch-events' }
-      );
+    // Get current date in YYYY-MM-DD format
+    const today = new Date().toISOString().split('T')[0];
 
-      const { events, pagination } = response.data.data;
-      setEvents(events || []);
-      setTotalPages(pagination?.pages || 1);
-    } catch (error) {
-      console.error('Error fetching events:', error);
-      const message = error.response?.data?.message || 'Failed to load events';
-      setError(message);
+    const params = {
+      page: currentPage,
+      limit: 6,
+      search: searchTerm,
+    };
+
+    // Add date filter if specified
+    if (filterDate) {
+      params.date = filterDate.toISOString().split('T')[0];
     }
-  };
+
+    // Add filter condition based on upcoming/past selection
+    if (filter === 'upcoming') {
+      params.startDate = today; // Events on or after today
+    } else if (filter === 'past') {
+      params.endDate = today; // Events before today
+    }
+
+    const response = await axios.get(
+      `${API_BASE_URL}/view-event`,
+      {
+        ...getAuthHeaders(),
+        params
+      }
+    );
+
+    const { events, pagination } = response.data.data;
+    setEvents(events || []);
+    setTotalPages(pagination?.pages || 1);
+  } catch (error) {
+    console.error('Error fetching events:', error);
+    const message = error.response?.data?.message || 'Failed to load events';
+    setError(message);
+    toast.error(message);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const fetchEventDetails = async (eventId) => {
     try {
       if (!/^[0-9a-fA-F]{24}$/.test(eventId)) {
         throw new Error('Invalid event ID');
       }
-      const promise = axios.get(
-        `${API_BASE_URL}//view-event/${eventId}`,
+      const response = await axios.get(
+        `${API_BASE_URL}/view-event/${eventId}`,
         getAuthHeaders()
       );
-
-      const response = await toast.promise(
-        promise,
-        {
-          pending: 'Loading event details...',
-          success: 'Event details loaded',
-          error: {
-            render({ data }) {
-              return data.response?.data?.message || 'Failed to load event details';
-            }
-          }
-        },
-        { toastId: 'fetch-event-details' }
-      );
-
       return response.data.data;
     } catch (error) {
       console.error('Error fetching event details:', error);
@@ -111,6 +104,7 @@ const EventsPage = () => {
       } else if (error.response?.status === 404) {
         message = 'Event not found';
       }
+      toast.error(message);
       return null;
     }
   };
@@ -133,23 +127,29 @@ const EventsPage = () => {
     })} at ${timeString || 'Time TBD'}`;
   };
 
-  const filteredEvents = events.filter(event => {
-    const matchesSearch = !searchTerm ||
-      event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      event.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      event.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesDate = !filterDate ||
-      new Date(event.date).toDateString() === filterDate.toDateString();
-    return matchesSearch && matchesDate;
-  });
+  // Filter events client-side if needed (or rely on server-side filtering)
+const filteredEvents = events.filter(event => {
+  const matchesSearch = !searchTerm ||
+    event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    event.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    event.description.toLowerCase().includes(searchTerm.toLowerCase());
+
+  const matchesDate = !filterDate ||
+    new Date(event.date).toDateString() === filterDate.toDateString();
+
+  const eventDate = new Date(event.date).toISOString().split('T')[0];
+  const today = new Date().toISOString().split('T')[0];
+  
+  const matchesFilter = filter === 'upcoming' 
+    ? eventDate >= today 
+    : eventDate < today;
+
+  return matchesSearch && matchesDate && matchesFilter;
+});
 
   useEffect(() => {
     fetchEvents();
-  }, [filter, currentPage]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, filterDate]);
+  }, [filter, currentPage, searchTerm, filterDate]);
 
   const EventCard = ({ event }) => (
     <div className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-shadow duration-300">
@@ -159,6 +159,7 @@ const EventsPage = () => {
             src={event.imageUrl}
             alt={event.title}
             className="w-full h-full object-cover"
+            loading="lazy"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-r from-blue-500 to-purple-600 text-white text-4xl font-bold">
@@ -205,6 +206,7 @@ const EventsPage = () => {
               src={event.imageUrl}
               alt={event.title}
               className="w-full h-full object-cover rounded-t-xl"
+              loading="lazy"
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gradient-to-r from-blue-500 to-purple-600 text-white text-5xl font-bold rounded-t-xl">
@@ -266,41 +268,52 @@ const EventsPage = () => {
           <h1 className="text-3xl font-bold text-gray-800">Community Events</h1>
           <p className="text-gray-600 mt-2">Discover and explore upcoming and past events in your society</p>
         </div>
+
+        {/* Filter Tabs */}
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden mb-8">
           <div className="flex border-b border-gray-200">
             <button
-              onClick={() => { setFilter('upcoming'); setCurrentPage(1); }}
-              className={`flex-1 py-4 px-6 text-center font-medium transition-colors ${
-                filter === 'upcoming'
+              onClick={() => {
+                setFilter('upcoming');
+                setCurrentPage(1);
+              }}
+              className={`flex-1 py-4 px-6 text-center font-medium transition-colors ${filter === 'upcoming'
                   ? 'text-blue-600 border-b-2 border-blue-600'
                   : 'text-gray-500 hover:text-blue-700'
-              }`}
+                }`}
               aria-label="Show upcoming events"
             >
               Upcoming Events
             </button>
             <button
-              onClick={() => { setFilter('past'); setCurrentPage(1); }}
-              className={`flex-1 py-4 px-6 text-center font-medium transition-colors ${
-                filter === 'past'
+              onClick={() => {
+                setFilter('past');
+                setCurrentPage(1);
+              }}
+              className={`flex-1 py-4 px-6 text-center font-medium transition-colors ${filter === 'past'
                   ? 'text-blue-600 border-b-2 border-blue-600'
                   : 'text-gray-500 hover:text-blue-700'
-              }`}
+                }`}
               aria-label="Show past events"
             >
               Past Events
             </button>
           </div>
         </div>
+
+        {/* Search and Filter */}
         <div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="relative flex-1">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search size={18} className="text-gray-400" />
+              </div>
               <input
                 type="text"
                 placeholder="Search events by title, location, or description..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-4 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                 aria-label="Search events"
               />
             </div>
@@ -318,8 +331,14 @@ const EventsPage = () => {
             </div>
           </div>
         </div>
+
+        {/* Events List */}
         <div className="bg-white rounded-2xl shadow-lg p-6">
-          {error ? (
+          {isLoading ? (
+            <div className="flex justify-center items-center py-20">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+            </div>
+          ) : error ? (
             <div className="text-center py-12">
               <AlertCircle size={40} className="mx-auto text-red-500 mb-4" />
               <p className="text-red-500 mb-4">{error}</p>
@@ -342,11 +361,10 @@ const EventsPage = () => {
                 <button
                   onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                   disabled={currentPage === 1}
-                  className={`p-3 rounded-full transition-colors ${
-                    currentPage === 1
+                  className={`p-3 rounded-full transition-colors ${currentPage === 1
                       ? 'text-gray-400 cursor-not-allowed'
                       : 'text-blue-600 hover:bg-blue-100'
-                  }`}
+                    }`}
                   aria-label="Previous page"
                 >
                   <ChevronLeft size={24} />
@@ -357,11 +375,10 @@ const EventsPage = () => {
                 <button
                   onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                   disabled={currentPage === totalPages}
-                  className={`p-3 rounded-full transition-colors ${
-                    currentPage === totalPages
+                  className={`p-3 rounded-full transition-colors ${currentPage === totalPages
                       ? 'text-gray-400 cursor-not-allowed'
                       : 'text-blue-600 hover:bg-blue-100'
-                  }`}
+                    }`}
                   aria-label="Next page"
                 >
                   <ChevronRight size={24} />
@@ -388,6 +405,8 @@ const EventsPage = () => {
           )}
         </div>
       </div>
+
+      {/* Event Details Modal */}
       {selectedEvent && (
         <EventDetailsModal
           event={selectedEvent}

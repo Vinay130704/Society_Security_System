@@ -1,13 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import {
   QrCode, CheckCircle, XCircle, Camera, User, Smartphone, Home, AlertCircle,
-  Search, Clock, LogOut, List, Info, Loader2, Image as ImageIcon, ChevronLeft, ChevronRight
+  Search, Clock, LogOut, List, Info, Loader2, Image as ImageIcon
 } from 'lucide-react';
 import Webcam from 'react-webcam';
 import jsQR from 'jsqr';
+import debounce from 'lodash.debounce';
 
 const SecurityVisitorManagement = () => {
   const [activeTab, setActiveTab] = useState('scan');
@@ -29,13 +30,13 @@ const SecurityVisitorManagement = () => {
   const [logsLoading, setLogsLoading] = useState(false);
   const [isUnregisteredFlow, setIsUnregisteredFlow] = useState(false);
   const [pendingApprovals, setPendingApprovals] = useState([]);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [searchTerm, setSearchTerm] = useState('');
-
+  const [searchSuggestions, setSearchSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const API_BASE_URL = 'http://localhost:5000/api';
   const webcamRef = useRef(null);
   const canvasRef = useRef(null);
+  const searchRef = useRef(null);
 
   // Get authentication headers
   const getAuthHeaders = () => {
@@ -56,22 +57,70 @@ const SecurityVisitorManagement = () => {
     };
   };
 
-  // Fetch all visitor logs
+  // Debounced function to fetch name suggestions
+  const fetchSuggestions = useCallback(
+    debounce(async (query) => {
+      if (!query.trim()) {
+        setSearchSuggestions([]);
+        setShowSuggestions(false);
+        return;
+      }
+
+      setSuggestionsLoading(true);
+      try {
+        const response = await axios.get(
+          `${API_BASE_URL}/visitor/search?name=${encodeURIComponent(query)}`,
+          getAuthHeaders()
+        );
+
+        if (response.data.success) {
+          const visitors = response.data.data || [];
+          const suggestions = visitors.map((visitor) => ({
+            id: visitor._id,
+            name: visitor.name,
+            qr_code: visitor.qr_code,
+          }));
+          setSearchSuggestions(suggestions);
+          setShowSuggestions(suggestions.length > 0);
+        } else {
+          setSearchSuggestions([]);
+          setShowSuggestions(false);
+        }
+      } catch (error) {
+        console.error('Error fetching suggestions:', error);
+        setSearchSuggestions([]);
+        setShowSuggestions(false);
+      } finally {
+        setSuggestionsLoading(false);
+      }
+    }, 300),
+    [getAuthHeaders]
+  );
+
+  // Handle clicks outside to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchRef.current && !searchRef.current.contains(event.target)) {
+        setShowSuggestions(false);
+        setSearchSuggestions([]);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Fetch visitor logs
   const fetchVisitorLogs = async () => {
     setLogsLoading(true);
     try {
-      const response = await axios.get(
-        `${API_BASE_URL}/visitor/security/logs`,
-        getAuthHeaders()
-      );
+      const response = await axios.get(`${API_BASE_URL}/visitor/security/logs`, getAuthHeaders());
       if (response.data.success) {
         setVisitorLogs(response.data.data || []);
-        setTotalPages(response.data.totalPages || 1);
       } else {
         throw new Error(response.data.message || 'Failed to load visitor logs');
       }
     } catch (error) {
-      console.error('Error fetching logs:', error);
       toast.error(error.response?.data?.message || 'Failed to load visitor logs', {
         position: 'top-right',
         autoClose: 5000,
@@ -84,17 +133,13 @@ const SecurityVisitorManagement = () => {
   // Fetch pending approvals
   const fetchPendingApprovals = async () => {
     try {
-      const response = await axios.get(
-        `${API_BASE_URL}/visitor/pending`,
-        getAuthHeaders()
-      );
+      const response = await axios.get(`${API_BASE_URL}/visitor/pending`, getAuthHeaders());
       if (response.data.success) {
         setPendingApprovals(response.data.data || []);
       } else {
         throw new Error(response.data.message || 'Failed to load pending approvals');
       }
     } catch (error) {
-      console.error('Error fetching pending approvals:', error);
       toast.error(error.response?.data?.message || 'Failed to load pending approvals', {
         position: 'top-right',
         autoClose: 5000,
@@ -102,9 +147,9 @@ const SecurityVisitorManagement = () => {
     }
   };
 
-  // QR Code Scanning Logic
+  // QR code scanning logic
   const scanQRCode = () => {
-    if (!webcamRef.current || !canvasRef.current) return;
+    if (!webcamRef.current || !canvasRef.current || !webcamRef.current.video) return;
 
     const video = webcamRef.current.video;
     if (!video || video.videoWidth === 0 || video.videoHeight === 0) return;
@@ -140,7 +185,7 @@ const SecurityVisitorManagement = () => {
     } else if (activeTab === 'approvals') {
       fetchPendingApprovals();
     }
-  }, [activeTab, page, searchTerm]);
+  }, [activeTab]);
 
   // Capture image from webcam
   const captureImage = () => {
@@ -152,7 +197,6 @@ const SecurityVisitorManagement = () => {
       setCapturedImage(imageSrc);
       setShowCamera(false);
     } catch (err) {
-      console.error('Capture error:', err);
       toast.error('Failed to capture image', {
         position: 'top-right',
         autoClose: 3000,
@@ -185,23 +229,22 @@ const SecurityVisitorManagement = () => {
       if (response.data.success) {
         setScanResult(response.data);
         setVisitorDetails(response.data.data);
-        toast.success('QR Code scanned successfully!', {
+        toast.success('QR code scanned successfully!', {
           position: 'top-right',
           autoClose: 3000,
         });
-        if (['granted', 'checked_in'].includes(response.data.data.entry_status)) {
+        if (response.data.data.entry_status === 'granted') {
           setShowCamera(true);
         }
       }
     } catch (error) {
-      console.error('Scan error:', error);
       const errorMsg = error.response?.data?.message || 'Failed to scan QR code';
       setError(errorMsg);
       toast.error(errorMsg, {
         position: 'top-right',
         autoClose: 5000,
       });
-      if (error.response?.status === 404 || errorMsg.includes('Invalid QR code')) {
+      if (errorMsg.includes('Invalid QR code')) {
         setIsUnregisteredFlow(true);
         setShowCamera(true);
       }
@@ -271,7 +314,6 @@ const SecurityVisitorManagement = () => {
       resetForm();
       fetchPendingApprovals();
     } catch (error) {
-      console.error('Error sending for approval:', error);
       toast.error(error.response?.data?.message || 'Failed to send for approval', {
         position: 'top-right',
         autoClose: 5000,
@@ -282,9 +324,10 @@ const SecurityVisitorManagement = () => {
   };
 
   // Search visitor by name
-  const handleManualSearch = async () => {
-    if (!manualName.trim()) {
-      setError('Please enter a name');
+  const handleManualSearch = async (selectedQrCode = null) => {
+    const searchValue = selectedQrCode || manualName;
+    if (!searchValue.trim()) {
+      setError('Please enter or select a name');
       toast.error('Please enter a name', {
         position: 'top-right',
         autoClose: 3000,
@@ -296,32 +339,70 @@ const SecurityVisitorManagement = () => {
     setError(null);
 
     try {
-      const response = await axios.get(
-        `${API_BASE_URL}/visitor/search?name=${manualName}`,
-        getAuthHeaders()
-      );
-
-      if (response.data.success && response.data.data.length > 0) {
-        const visitor = response.data.data[0];
-        setVisitorDetails(visitor);
-        setQrCode(visitor.qr_code);
-        setScanResult({ success: true, data: visitor });
-        toast.success('Visitor found!', {
-          position: 'top-right',
-          autoClose: 3000,
-        });
-        setShowCamera(true);
+      if (selectedQrCode) {
+        await handleScan(selectedQrCode);
       } else {
-        toast.info('No visitor found with that name', {
-          position: 'top-right',
-          autoClose: 3000,
-        });
-        setIsUnregisteredFlow(true);
-        setShowCamera(true);
+        const response = await axios.get(
+          `${API_BASE_URL}/visitor/search?name=${encodeURIComponent(searchValue)}`,
+          getAuthHeaders()
+        );
+
+        if (response.data.success && response.data.data.length > 0) {
+          const visitor = response.data.data[0];
+          setVisitorDetails(visitor);
+          setQrCode(visitor.qr_code);
+          setScanResult({ success: true, data: visitor });
+          toast.success('Visitor found!', {
+            position: 'top-right',
+            autoClose: 3000,
+          });
+          if (visitor.entry_status === 'granted') {
+            setShowCamera(true);
+          }
+        } else {
+          toast.info('No visitor found with that name', {
+            position: 'top-right',
+            autoClose: 3000,
+          });
+          setIsUnregisteredFlow(true);
+          setShowCamera(true);
+        }
       }
     } catch (error) {
-      console.error('Search error:', error);
       toast.error(error.response?.data?.message || 'Failed to search visitor', {
+        position: 'top-right',
+        autoClose: 5000,
+      });
+    } finally {
+      setLoading(false);
+      setShowSuggestions(false);
+    }
+  };
+
+  // Record visitor exit
+  const handleExitVisitor = async (visitorId) => {
+    setLoading(true);
+    try {
+      const response = await axios.get(`${API_BASE_URL}/visitor/${visitorId}/exit`, getAuthHeaders());
+      toast.success(response.data.message || 'Exit recorded successfully', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+      if (activeTab === 'logs') {
+        fetchVisitorLogs();
+      }
+      if (activeTab === 'scan' && scanResult) {
+        setScanResult({
+          ...scanResult,
+          data: {
+            ...scanResult.data,
+            entry_status: 'checked_out',
+            exit_time: new Date().toISOString()
+          }
+        });
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to record exit', {
         position: 'top-right',
         autoClose: 5000,
       });
@@ -330,59 +411,11 @@ const SecurityVisitorManagement = () => {
     }
   };
 
-  // Record visitor exit
-const handleExitVisitor = async (visitorId) => {
-  setLoading(true);
-  try {
-    const response = await axios.post(
-      `${API_BASE_URL}/visitor/${visitorId}/exit`,
-      {}, // Empty body since we're just recording exit
-      getAuthHeaders()
-    );
-    
-    toast.success(response.data.message || 'Exit recorded successfully', {
-      position: 'top-right',
-      autoClose: 3000,
-    });
-    
-    // Refresh the visitor logs
-    if (activeTab === 'logs') {
-      fetchVisitorLogs();
-    }
-    
-    // If we're on the scan tab and have a scan result
-    if (activeTab === 'scan' && scanResult) {
-      setScanResult({
-        ...scanResult,
-        data: {
-          ...scanResult.data,
-          entry_status: 'checked_out',
-          exit_time: new Date().toISOString()
-        }
-      });
-    }
-    
-  } catch (error) {
-    console.error('Exit error:', error);
-    toast.error(error.response?.data?.message || 'Failed to record exit', {
-      position: 'top-right',
-      autoClose: 5000,
-    });
-  } finally {
-    setLoading(false);
-  }
-};
-
-
   // Approve pending visitor
   const handleApproveVisitor = async (visitorId) => {
     setLoading(true);
     try {
-      const response = await axios.post(
-        `${API_BASE_URL}/visitor/${visitorId}/approve`,
-        {},
-        getAuthHeaders()
-      );
+      const response = await axios.get(`${API_BASE_URL}/visitor/${visitorId}/approve`, getAuthHeaders());
       toast.success(response.data.message || 'Visitor approved successfully', {
         position: 'top-right',
         autoClose: 3000,
@@ -390,7 +423,6 @@ const handleExitVisitor = async (visitorId) => {
       fetchPendingApprovals();
       fetchVisitorLogs();
     } catch (error) {
-      console.error('Approve error:', error);
       toast.error(error.response?.data?.message || 'Failed to approve visitor', {
         position: 'top-right',
         autoClose: 5000,
@@ -404,11 +436,7 @@ const handleExitVisitor = async (visitorId) => {
   const handleDenyVisitor = async (visitorId) => {
     setLoading(true);
     try {
-      const response = await axios.post(
-        `${API_BASE_URL}/visitor/${visitorId}/deny`,
-        {},
-        getAuthHeaders()
-      );
+      const response = await axios.get(`${API_BASE_URL}/visitor/${visitorId}/deny`, getAuthHeaders());
       toast.success(response.data.message || 'Visitor denied successfully', {
         position: 'top-right',
         autoClose: 3000,
@@ -416,7 +444,6 @@ const handleExitVisitor = async (visitorId) => {
       fetchPendingApprovals();
       fetchVisitorLogs();
     } catch (error) {
-      console.error('Deny error:', error);
       toast.error(error.response?.data?.message || 'Failed to deny visitor', {
         position: 'top-right',
         autoClose: 5000,
@@ -439,16 +466,18 @@ const handleExitVisitor = async (visitorId) => {
       name: '',
       phone: '',
       flat_no: '',
-      purpose: '',
+      purpose: ''
     });
     setIsUnregisteredFlow(false);
+    setSearchSuggestions([]);
+    setShowSuggestions(false);
   };
 
   // Webcam video constraints
   const videoConstraints = {
     width: 1280,
     height: 720,
-    facingMode: 'environment',
+    facingMode: 'environment'
   };
 
   // Handle visitor detail input changes
@@ -456,7 +485,7 @@ const handleExitVisitor = async (visitorId) => {
     const { name, value } = e.target;
     setVisitorDetails((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: value
     }));
   };
 
@@ -468,19 +497,19 @@ const handleExitVisitor = async (visitorId) => {
       month: 'short',
       year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit',
+      minute: '2-digit'
     });
   };
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
-      <div className="max-w-6xl mx-auto bg-white rounded-xl shadow-md overflow-hidden">
+      <div className="max-w-10xl mx-auto bg-white rounded-xl shadow-md overflow-hidden">
         {/* Header */}
-        <div className="bg-blue-600 text-white p-4 md:p-6">
+        <div className="bg-blue-400 text-white p-4 md:p-6">
           <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
             <QrCode size={28} /> Security Visitor Management
           </h1>
-          <p className="mt-1 text-sm md:text-base">Scan QR codes, manage visitor entries, and review logs</p>
+          <p className="mt-1 text-sm md:text-base">Record visitor entries, exits, and manage approvals</p>
         </div>
 
         {/* Tabs */}
@@ -491,9 +520,7 @@ const handleExitVisitor = async (visitorId) => {
               resetForm();
             }}
             className={`flex-1 py-3 text-center font-medium flex items-center justify-center gap-2 text-sm md:text-base ${
-              activeTab === 'scan'
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-500 hover:text-gray-700'
+              activeTab === 'scan' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
             <QrCode size={18} /> Scan Visitor
@@ -501,9 +528,7 @@ const handleExitVisitor = async (visitorId) => {
           <button
             onClick={() => setActiveTab('logs')}
             className={`flex-1 py-3 text-center font-medium flex items-center justify-center gap-2 text-sm md:text-base ${
-              activeTab === 'logs'
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-500 hover:text-gray-700'
+              activeTab === 'logs' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
             <List size={18} /> Visitor Logs
@@ -511,9 +536,7 @@ const handleExitVisitor = async (visitorId) => {
           <button
             onClick={() => setActiveTab('approvals')}
             className={`flex-1 py-3 text-center font-medium flex items-center justify-center gap-2 text-sm md:text-base ${
-              activeTab === 'approvals'
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-500 hover:text-gray-700'
+              activeTab === 'approvals' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
             <CheckCircle size={18} /> Pending Approvals
@@ -541,7 +564,7 @@ const handleExitVisitor = async (visitorId) => {
                         type="text"
                         value={qrCode}
                         onChange={(e) => setQrCode(e.target.value)}
-                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         placeholder="Enter QR code (e.g., VISITOR-A101-uuid)"
                         disabled={loading}
                       />
@@ -549,9 +572,7 @@ const handleExitVisitor = async (visitorId) => {
                         onClick={handleScan}
                         disabled={loading}
                         className={`px-4 py-2 rounded-lg flex items-center justify-center gap-2 text-sm ${
-                          loading
-                            ? 'bg-gray-300 cursor-not-allowed'
-                            : 'bg-blue-600 text-white hover:bg-blue-700'
+                          loading ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'
                         }`}
                       >
                         {loading ? <Loader2 className="animate-spin h-5 w-5" /> : 'Scan'}
@@ -570,9 +591,7 @@ const handleExitVisitor = async (visitorId) => {
                         }
                       }}
                       className={`w-full py-2 rounded-lg flex items-center justify-center gap-2 text-sm ${
-                        isScanningQR
-                          ? 'bg-red-600 text-white hover:bg-red-700'
-                          : 'bg-blue-600 text-white hover:bg-blue-700'
+                        isScanningQR ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-blue-600 text-white hover:bg-blue-700'
                       }`}
                     >
                       {isScanningQR ? 'Stop Camera' : 'Use Webcam Scanner'}
@@ -594,30 +613,60 @@ const handleExitVisitor = async (visitorId) => {
                   )}
 
                   {/* Manual Search */}
-                  <div>
+                  <div ref={searchRef}>
                     <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
                       <Search size={18} /> Search by Name
                     </h3>
-                    <div className="flex gap-2">
+                    <div className="relative flex gap-2">
                       <input
                         type="text"
                         value={manualName}
-                        onChange={(e) => setManualName(e.target.value)}
-                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Enter visitor name"
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setManualName(value);
+                          fetchSuggestions(value);
+                        }}
+                        onFocus={() => {
+                          if (searchSuggestions.length > 0) setShowSuggestions(true);
+                        }}
+                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        placeholder="Type to search visitor name"
                         disabled={loading}
                       />
                       <button
-                        onClick={handleManualSearch}
+                        onClick={() => handleManualSearch()}
                         disabled={loading}
                         className={`px-4 py-2 rounded-lg flex items-center justify-center gap-2 text-sm ${
-                          loading
-                            ? 'bg-gray-300 cursor-not-allowed'
-                            : 'bg-blue-600 text-white hover:bg-blue-700'
+                          loading ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'
                         }`}
                       >
                         {loading ? <Loader2 className="animate-spin h-5 w-5" /> : 'Search'}
                       </button>
+                      {showSuggestions && (
+                        <ul className="absolute z-10 top-12 left-0 w-3/4 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto py-1 mt-2">
+                          {suggestionsLoading ? (
+                            <li className="px-4 py-2 text-center text-sm text-gray-500">
+                              Loading... <Loader2 className="animate-spin h-4 w-4 inline mx-2" />
+                            </li>
+                          ) : searchSuggestions.length > 0 ? (
+                            searchSuggestions.map((suggestion) => (
+                              <li
+                                key={suggestion.id}
+                                onClick={() => {
+                                  setManualName(suggestion.name);
+                                  setShowSuggestions(false);
+                                  handleManualSearch(suggestion.qr_code);
+                                }}
+                                className="px-4 py-2 cursor-pointer hover:bg-gray-100 text-sm"
+                              >
+                                {suggestion.name}
+                              </li>
+                            ))
+                          ) : (
+                            <li className="px-4 py-2 text-sm text-gray-500">No matching visitors found</li>
+                          )}
+                        </ul>
+                      )}
                     </div>
                   </div>
 
@@ -630,28 +679,28 @@ const handleExitVisitor = async (visitorId) => {
                       <div className="space-y-3">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Visitor Name* <span className="text-red-500">*</span>
+                            Visitor Name <span className="text-red-500">*</span>
                           </label>
                           <input
                             type="text"
                             name="name"
                             value={visitorDetails.name}
                             onChange={handleVisitorDetailChange}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                             placeholder="Enter visitor name"
                             required
                           />
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Phone Number* <span className="text-red-500">*</span>
+                            Phone Number <span className="text-red-500">*</span>
                           </label>
                           <input
                             type="text"
                             name="phone"
                             value={visitorDetails.phone}
                             onChange={handleVisitorDetailChange}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                             placeholder="Enter 10-digit phone number"
                             pattern="\d{10}"
                             required
@@ -659,14 +708,14 @@ const handleExitVisitor = async (visitorId) => {
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Flat Number* <span className="text-red-500">*</span>
+                            Flat Number <span className="text-red-500">*</span>
                           </label>
                           <input
                             type="text"
                             name="flat_no"
                             value={visitorDetails.flat_no}
                             onChange={handleVisitorDetailChange}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                             placeholder="Enter flat number (e.g., A101)"
                             required
                           />
@@ -680,7 +729,7 @@ const handleExitVisitor = async (visitorId) => {
                             name="purpose"
                             value={visitorDetails.purpose}
                             onChange={handleVisitorDetailChange}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                             placeholder="Enter purpose (e.g., Guest, Delivery)"
                           />
                         </div>
@@ -710,48 +759,48 @@ const handleExitVisitor = async (visitorId) => {
                             <div className="flex items-center gap-2">
                               <User size={16} className="text-gray-500" />
                               <span className="font-medium text-sm">Name:</span>
-                              <span className="text-sm">{visitorDetails?.name}</span>
+                              <span className="text-sm">{visitorDetails.name}</span>
                             </div>
                             <div className="flex items-center gap-2">
                               <Smartphone size={16} className="text-gray-500" />
                               <span className="font-medium text-sm">Phone:</span>
-                              <span className="text-sm">{visitorDetails?.phone}</span>
+                              <span className="text-sm">{visitorDetails.phone}</span>
                             </div>
                             <div className="flex items-center gap-2">
                               <Home size={16} className="text-gray-500" />
                               <span className="font-medium text-sm">Flat:</span>
-                              <span className="text-sm">{visitorDetails?.flat_no}</span>
+                              <span className="text-sm">{visitorDetails.flat_no}</span>
                             </div>
                             <div className="flex items-center gap-2">
                               <Clock size={16} className="text-gray-500" />
                               <span className="font-medium text-sm">Status:</span>
                               <span
                                 className={`px-2 py-1 text-xs rounded-full text-sm ${
-                                  visitorDetails?.entry_status === 'checked_in'
+                                  visitorDetails.entry_status === 'checked_in'
                                     ? 'bg-green-100 text-green-800'
-                                    : visitorDetails?.entry_status === 'exit'
+                                    : visitorDetails.entry_status === 'checked_out'
                                     ? 'bg-blue-100 text-blue-800'
-                                    : visitorDetails?.entry_status === 'pending'
+                                    : visitorDetails.entry_status === 'pending'
                                     ? 'bg-yellow-100 text-yellow-800'
-                                    : visitorDetails?.entry_status === 'granted'
+                                    : visitorDetails.entry_status === 'granted'
                                     ? 'bg-emerald-100 text-emerald-800'
-                                    : visitorDetails?.entry_status === 'denied'
+                                    : visitorDetails.entry_status === 'denied'
                                     ? 'bg-red-100 text-red-800'
                                     : 'bg-gray-100 text-gray-800'
                                 }`}
                               >
-                                {visitorDetails?.entry_status.replace('_', ' ')}
+                                {visitorDetails.entry_status.replace('_', ' ')}
                               </span>
                             </div>
-                            {visitorDetails?.purpose && (
+                            {visitorDetails.purpose && (
                               <div className="flex items-center gap-2 col-span-2">
                                 <Info size={16} className="text-gray-500" />
                                 <span className="font-medium text-sm">Purpose:</span>
-                                <span className="text-sm">{visitorDetails?.purpose}</span>
+                                <span className="text-sm">{visitorDetails.purpose}</span>
                               </div>
                             )}
                           </div>
-                          {visitorDetails?.qr_code && (
+                          {visitorDetails.qr_code && (
                             <div className="mt-2">
                               <a
                                 href={`${API_BASE_URL}/visitor/qr/${visitorDetails.qr_code}`}
@@ -765,7 +814,7 @@ const handleExitVisitor = async (visitorId) => {
                           )}
                         </div>
                       </div>
-                      {['granted', 'checked_in'].includes(visitorDetails?.entry_status) && (
+                      {['granted', 'checked_in'].includes(visitorDetails.entry_status) && (
                         <div className="mt-4 flex justify-end">
                           <button
                             onClick={() => handleExitVisitor(visitorDetails._id)}
@@ -825,14 +874,10 @@ const handleExitVisitor = async (visitorId) => {
                             {isUnregisteredFlow && (
                               <button
                                 onClick={handleSendForApproval}
-                                className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg flex items-center justify-center gap-2 text-sm"
+                                className="flex-1 bg-green-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg flex items-center justify-center gap-2 text-sm"
                                 disabled={loading}
                               >
-                                {loading ? (
-                                  <Loader2 className="animate-spin h-5 w-5" />
-                                ) : (
-                                  'Send for Approval'
-                                )}
+                                {loading ? <Loader2 className="animate-spin h-5 w-5" /> : 'Send for Approval'}
                               </button>
                             )}
                           </>
@@ -851,28 +896,13 @@ const handleExitVisitor = async (visitorId) => {
                 <h2 className="text-xl font-semibold flex items-center gap-2">
                   <List size={20} /> Visitor Logs
                 </h2>
-                <div className="flex gap-3 w-full md:w-auto">
-                  <div className="relative flex-1 md:w-64">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                    <input
-                      type="text"
-                      value={searchTerm}
-                      onChange={(e) => {
-                        setSearchTerm(e.target.value);
-                        setPage(1);
-                      }}
-                      placeholder="Search by name, phone, or flat"
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                  <button
-                    onClick={fetchVisitorLogs}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm"
-                    disabled={logsLoading}
-                  >
-                    {logsLoading ? <Loader2 className="animate-spin h-5 w-5" /> : 'Refresh'}
-                  </button>
-                </div>
+                <button
+                  onClick={fetchVisitorLogs}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm"
+                  disabled={logsLoading}
+                >
+                  {logsLoading ? <Loader2 className="animate-spin h-5 w-5" /> : 'Refresh'}
+                </button>
               </div>
 
               {logsLoading ? (
@@ -880,140 +910,114 @@ const handleExitVisitor = async (visitorId) => {
                   <Loader2 className="animate-spin h-12 w-12 text-blue-500" />
                 </div>
               ) : (
-                <>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Visitor
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Phone
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Flat
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Entry Time
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Exit Time
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {visitorLogs.length === 0 ? (
                         <tr>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Visitor
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Phone
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Flat
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Status
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Entry Time
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Exit Time
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Actions
-                          </th>
+                          <td colSpan="7" className="px-4 py-4 text-center text-gray-500 text-sm">
+                            No visitor logs found
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {visitorLogs.length === 0 ? (
-                          <tr>
-                            <td colSpan="7" className="px-4 py-4 text-center text-gray-500 text-sm">
-                              No visitor logs found
+                      ) : (
+                        visitorLogs.map((visitor) => (
+                          <tr key={visitor._id} className="hover:bg-gray-50">
+                            <td className="px-4 py-4 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                  <User className="text-blue-600" size={16} />
+                                </div>
+                                <div className="ml-4">
+                                  <div className="text-sm font-medium text-gray-900">{visitor.name}</div>
+                                  <div className="text-xs text-gray-500">{visitor.purpose || 'Guest'}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {visitor.phone}
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {visitor.flat_no}
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap">
+                              <span
+                                className={`px-2 py-1 text-xs font-medium rounded-full text-sm ${
+                                  visitor.entry_status === 'checked_in'
+                                    ? 'bg-green-100 text-green-800'
+                                    : visitor.entry_status === 'checked_out'
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : visitor.entry_status === 'pending'
+                                    ? 'bg-yellow-100 text-yellow-800'
+                                    : visitor.entry_status === 'granted'
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : visitor.entry_status === 'denied'
+                                    ? 'bg-red-100 text-red-800'
+                                    : 'bg-gray-100 text-gray-800'
+                                }`}
+                              >
+                                {visitor.entry_status.replace('_', ' ')}
+                              </span>
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {formatDate(visitor.entry_time)}
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {formatDate(visitor.exit_time)}
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
+                              <div className="flex gap-3">
+                                {['checked_in', 'granted'].includes(visitor.entry_status) && (
+                                  <button
+                                    onClick={() => handleExitVisitor(visitor._id)}
+                                    className="text-blue-600 hover:text-blue-900 flex items-center gap-1 text-sm"
+                                    disabled={loading}
+                                  >
+                                    <LogOut size={14} /> Mark Exit
+                                  </button>
+                                )}
+                                {visitor.image && (
+                                  <a
+                                    href={visitor.image}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-indigo-600 hover:text-indigo-900 flex items-center gap-1 text-sm"
+                                  >
+                                    <Camera size={14} /> View Image
+                                  </a>
+                                )}
+                              </div>
                             </td>
                           </tr>
-                        ) : (
-                          visitorLogs.map((visitor) => (
-                            <tr key={visitor._id} className="hover:bg-gray-50">
-                              <td className="px-4 py-4 whitespace-nowrap">
-                                <div className="flex items-center">
-                                  <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
-                                    <User className="text-blue-600" size={16} />
-                                  </div>
-                                  <div className="ml-4">
-                                    <div className="text-sm font-medium text-gray-900">{visitor.name}</div>
-                                    <div className="text-xs text-gray-500">{visitor.purpose || 'Guest'}</div>
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {visitor.phone}
-                              </td>
-                              <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {visitor.flat_no}
-                              </td>
-                              <td className="px-4 py-4 whitespace-nowrap">
-                                <span
-                                  className={`px-2 py-1 text-xs font-medium rounded-full text-sm ${
-                                    visitor.entry_status === 'checked_in'
-                                      ? 'bg-green-100 text-green-800'
-                                      : visitor.entry_status === 'exit'
-                                      ? 'bg-blue-100 text-blue-800'
-                                      : visitor.entry_status === 'pending'
-                                      ? 'bg-yellow-100 text-yellow-800'
-                                      : visitor.entry_status === 'granted'
-                                      ? 'bg-emerald-100 text-emerald-800'
-                                      : visitor.entry_status === 'denied'
-                                      ? 'bg-red-100 text-red-800'
-                                      : 'bg-gray-100 text-gray-800'
-                                  }`}
-                                >
-                                  {visitor.entry_status.replace('_', ' ')}
-                                </span>
-                              </td>
-                              <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {formatDate(visitor.entry_time)}
-                              </td>
-                              <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {formatDate(visitor.exit_time)}
-                              </td>
-                              <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
-                                <div className="flex gap-3">
-                                  {['checked_in', 'granted'].includes(visitor.entry_status) && (
-                                    <button
-                                      onClick={() => handleExitVisitor(visitor._id)}
-                                      className="text-blue-600 hover:text-blue-900 flex items-center gap-1 text-sm"
-                                      disabled={loading}
-                                    >
-                                      <LogOut size={14} />
-                                      Mark Exit
-                                    </button>
-                                  )}
-                                  {(visitor.image || visitor.image) && (
-                                    <a
-                                      href={`${API_BASE_URL}/${visitor.image || visitor.image.replace(/\\/g, '/')}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-indigo-600 hover:text-indigo-900 flex items-center gap-1 text-sm"
-                                    >
-                                      <Camera size={14} />
-                                      View Image
-                                    </a>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                  {/* Pagination */}
-                  {totalPages > 1 && (
-                    <div className="p-4 flex justify-between items-center border-t border-gray-200">
-                      <button
-                        onClick={() => setPage((p) => Math.max(p - 1, 1))}
-                        disabled={page === 1 || logsLoading}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm disabled:bg-gray-200 disabled:opacity-50 hover:bg-blue-700 text-white"
-                      >
-                        <ChevronLeft size={16} /> Previous
-                      </button>
-                      <span className="text-sm text-gray-600">
-                        Page {page} of {totalPages}
-                      </span>
-                      <button
-                        onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
-                        disabled={page === totalPages || logsLoading}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm disabled:bg-gray-200 disabled:opacity-50 hover:bg-blue-700"
-                      >
-                        Next <ChevronRight size={16} />
-                      </button>
-                    </div>
-                  )}
-                </>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           )}

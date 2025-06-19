@@ -32,8 +32,8 @@ const UserRoles = () => {
         "Scan visitor QR codes",
         "Capture visitor image for unregistered visitors",
         "Verify registered vehicles",
-        "Approve/block staff IDs",
-        "View emergency alerts",
+        "Record Staff entries",
+        "Manage emergency alerts",
       ],
       bgColor: "bg-green-50",
       borderColor: "border-green-400",
@@ -46,6 +46,7 @@ const UserRoles = () => {
         "Approve new residents & guards",
         "Manage entire system (staff, vehicles, alerts)",
         "Broadcast security alerts",
+        "Add society Events" 
       ],
       bgColor: "bg-yellow-50",
       borderColor: "border-yellow-400",
@@ -73,32 +74,32 @@ const UserRoles = () => {
           {userRoles.map((role, index) => (
             <div
               key={index}
-              className={`${role.bgColor} p-8 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 relative overflow-hidden group`}
+              className={`${role.bgColor} p-8 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-200 relative overflow-hidden group`}
               data-aos="fade-up"
               data-aos-delay={index * 100}
             >
-              {/* 3D Accent Element */}
+              {/* Top accent bar */}
               <div className={`absolute top-0 left-0 w-full h-1 ${role.accentColor}`}></div>
               
-              {/* Floating Circle Effect */}
-              <div className={`absolute -bottom-4 -right-4 h-16 w-16 ${role.accentColor} opacity-10 rounded-full group-hover:opacity-20 transition-all duration-500`}></div>
-              
-              <div className="flex flex-col items-center">
-                <div className={`flex items-center justify-center h-16 w-16 mb-6 rounded-xl bg-white shadow-md ${role.borderColor} border-2`}>
-                  {role.icon}
-                </div>
-                <h3 className="text-xl font-semibold text-primary mb-4 text-center">{role.title}</h3>
-                <ul className="space-y-3 text-text">
-                  {role.description.map((point, i) => (
-                    <li key={i} className="flex items-start gap-3">
-                      <span className={`flex-shrink-0 inline-flex items-center justify-center h-6 w-6 rounded-full ${role.accentColor} text-white text-sm`}>
-                        ✓
-                      </span>
-                      <span>{point}</span>
-                    </li>
-                  ))}
-                </ul>
+              {/* Icon container */}
+              <div className={`flex items-center justify-center h-16 w-16 mb-6 rounded-xl bg-white shadow-md mx-auto ${role.borderColor} border-2`}>
+                {role.icon}
               </div>
+              
+              {/* Title */}
+              <h3 className="text-xl font-semibold text-primary mb-4 text-center">{role.title}</h3>
+              
+              {/* Features list */}
+              <ul className="space-y-3 text-text">
+                {role.description.map((point, i) => (
+                  <li key={i} className="flex items-start gap-3">
+                    <span className={`flex-shrink-0 inline-flex items-center justify-center h-6 w-6 rounded-full ${role.accentColor} text-white text-sm mt-0.5`}>
+                      ✓
+                    </span>
+                    <span>{point}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           ))}
         </div>

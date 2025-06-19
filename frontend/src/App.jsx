@@ -4,7 +4,6 @@ import HomePage from "./pages/Homepage";
 import FeaturesSection from "./components/FeaturesSection";
 import HowItWorks from "./components/HowItWorks";
 import UserRoles from "./components/UserRoles";
-import Testimonials from "./pages/Testimonials";
 import ContactUs from "./pages/ContactUs";
 import Login from "./pages/Login";
 import AboutUs from "./pages/About";
@@ -28,7 +27,6 @@ function App() {
         <Route path="/features" element={<FeaturesSection />} />
         <Route path="/how-it-works" element={<HowItWorks />} />
         <Route path="/user-roles" element={<UserRoles />} />
-        <Route path="/testimonials" element={<Testimonials />} />
         <Route path="/contact" element={<ContactUs />} />
         <Route path="/login" element={<Login />} />
         <Route path="/reset-password" element={<ChangePassword />} />

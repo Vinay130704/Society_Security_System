@@ -256,12 +256,7 @@ const StaffManagement = () => {
                 {residentData ? `Resident: ${residentData.name}` : 'No resident information available'}
               </p>
             </div>
-            <button
-              onClick={() => navigate('/dashboard')}
-              className="mt-4 md:mt-0 flex items-center gap-2 bg-blue-100 hover:bg-blue-200 text-blue-800 px-4 py-2 rounded-lg transition"
-            >
-              <User size={18} /> Back to Dashboard
-            </button>
+           
           </div>
         </div>
 

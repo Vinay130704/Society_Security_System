@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { Shield, User, Mail, Lock, Phone, Home, LogIn, Key, ArrowLeft, Clock } from "lucide-react";
-import SignupImage from "../../assets/signup.jpeg";
+// import SignupImage from "../../assets/signup.jpeg";
 import OTPInput from "react-otp-input";
 import Footer from "../../components/Footer";
 
@@ -260,13 +260,13 @@ const ResidentSignup = () => {
                     ? "Join your community's security network"
                     : "Enter the 6-digit code sent to your email"}
                 </p>
-                <div className="mt-8 transform hover:scale-105 transition-transform duration-300">
+                {/* <div className="mt-8 transform hover:scale-105 transition-transform duration-300">
                   <img
                     src={SignupImage}
                     alt="Security System"
                     className="rounded-lg shadow-lg border-4 border-white/20 object-cover h-64 w-full"
                   />
-                </div>
+                </div> */}
               </div>
             </div>
 

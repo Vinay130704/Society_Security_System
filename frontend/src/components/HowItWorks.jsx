@@ -2,45 +2,7 @@ import { useEffect } from "react";
 import AOS from "aos";
 import "aos/dist/aos.css";
 import { Shield, UserCheck, Bell, Settings, Lock, Eye } from "lucide-react";
-
-const steps = [
-  {
-    number: "01",
-    icon: <UserCheck className="h-8 w-8 text-secondary" />,
-    title: "Register Your Account",
-    description: "Create your secure account with verified credentials to access all security features."
-  },
-  {
-    number: "02",
-    icon: <Shield className="h-8 w-8 text-secondary" />,
-    title: "Setup Security Profile",
-    description: "Configure your security preferences and access levels for complete protection."
-  },
-  {
-    number: "03",
-    icon: <Bell className="h-8 w-8 text-secondary" />,
-    title: "Receive Alerts",
-    description: "Get instant notifications for any security events in your community."
-  },
-  {
-    number: "04",
-    icon: <Eye className="h-8 w-8 text-secondary" />,
-    title: "Monitor Activity",
-    description: "View real-time security monitoring through our dashboard."
-  },
-  {
-    number: "05",
-    icon: <Settings className="h-8 w-8 text-secondary" />,
-    title: "Customize Settings",
-    description: "Adjust notification preferences and security parameters as needed."
-  },
-  {
-    number: "06",
-    icon: <Lock className="h-8 w-8 text-secondary" />,
-    title: "Enjoy Complete Security",
-    description: "Rest easy knowing your property is protected 24/7."
-  }
-];
+import { Link } from "react-router-dom";
 
 const HowItWorks = () => {
   useEffect(() => {
@@ -51,10 +13,49 @@ const HowItWorks = () => {
     });
   }, []);
 
+  const steps = [
+    {
+      number: "01",
+      icon: <UserCheck className="h-8 w-8 text-secondary" />,
+      title: "Register Your Account",
+      description: "Create your secure account with verified credentials to access all security features."
+    },
+    {
+      number: "02",
+      icon: <Shield className="h-8 w-8 text-secondary" />,
+      title: "Setup Security Profile",
+      description: "Configure your security preferences and access levels for complete protection."
+    },
+    {
+      number: "03",
+      icon: <Bell className="h-8 w-8 text-secondary" />,
+      title: "Receive Alerts",
+      description: "Get instant notifications for any security events in your community."
+    },
+    {
+      number: "04",
+      icon: <Eye className="h-8 w-8 text-secondary" />,
+      title: "Monitor Activity",
+      description: "View real-time security monitoring through our dashboard."
+    },
+    {
+      number: "05",
+      icon: <Settings className="h-8 w-8 text-secondary" />,
+      title: "Customize Settings",
+      description: "Adjust notification preferences and security parameters as needed."
+    },
+    {
+      number: "06",
+      icon: <Lock className="h-8 w-8 text-secondary" />,
+      title: "Enjoy Complete Security",
+      description: "Rest easy knowing your property is protected 24/7."
+    }
+  ];
+
   return (
     <div className="bg-background py-20 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
+        {/* Header Section */}
         <div className="text-center mb-16" data-aos="fade-up">
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-primary">
             How Guardian<span className="text-secondary">Net</span> Works
@@ -93,9 +94,12 @@ const HowItWorks = () => {
           <h3 className="text-2xl font-semibold text-primary mb-4">
             Ready to secure your property?
           </h3>
-          <button className="px-8 py-3 bg-secondary hover:bg-secondary-dark text-white font-medium rounded-lg shadow-md transition-all duration-300 transform hover:scale-105">
+          <Link
+            to="/resident-register"  // Replace with your actual route
+            className="inline-block px-8 py-3 bg-secondary hover:bg-secondary-dark text-white font-medium rounded-lg shadow-md transition-all duration-300 transform hover:scale-105"
+          >
             Get Started Today
-          </button>
+          </Link>
         </div>
       </div>
     </div>

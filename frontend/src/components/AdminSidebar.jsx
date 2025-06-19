@@ -23,7 +23,7 @@ const AdminLayout = () => {
   };
 
   const navItems = [
-    { name: "Dashboard", icon: Home, path: "/admin/admin-dashboard" },
+    // { name: "Dashboard", icon: Home, path: "/admin/admin-dashboard" },
     { name: "User Management", icon: Users, path: "/admin/user-management" },
     { name: "Manage Residents", icon: UserCog, path: "/admin/manage-residents" },
     { name: "Manage Guards", icon: HardHat, path: "/admin/manage-guards" },

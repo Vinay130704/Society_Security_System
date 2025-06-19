@@ -23,7 +23,8 @@ import {
   XCircle,
   RefreshCw,
   Mail,
-  Share2
+  Share2,
+  History
 } from "lucide-react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -45,6 +46,7 @@ const ResidentVisitorManagement = () => {
     phone: "",
     purpose: "Guest"
   });
+  const [selectedVisitorLogs, setSelectedVisitorLogs] = useState(null);
   const navigate = useNavigate();
 
   const [visitorForm, setVisitorForm] = useState({
@@ -136,8 +138,7 @@ const ResidentVisitorManagement = () => {
         phone: visitorForm.phone.replace(/\D/g, ""),
         purpose: visitorForm.purpose,
         flat_no: residentData.flat_no,
-        expected_arrival: visitorForm.expectedArrival,
-        is_pre_registered: true
+        expected_arrival: visitorForm.expectedArrival
       };
 
       const response = await axios.post(`${API_BASE_URL}/visitor/invite`, payload, headers);
@@ -186,7 +187,7 @@ const ResidentVisitorManagement = () => {
       const headers = getAuthHeaders();
       if (!headers) return;
 
-      await axios.post(`${API_BASE_URL}/visitor/resend-sms/${visitorId}`, {}, headers);
+      await axios.post(`${API_BASE_URL}/visitor/${visitorId}/resend-sms`, {}, headers);
       
       toast.update(toastId, {
         render: "SMS resent successfully",
@@ -207,64 +208,64 @@ const ResidentVisitorManagement = () => {
     }
   };
 
- const downloadQRCode = async (visitorId) => {
-  const toastId = toast.loading("Preparing QR code download...");
-  try {
-    const headers = getAuthHeaders();
-    if (!headers) return;
+  const downloadQRCode = async (visitorId) => {
+    const toastId = toast.loading("Preparing QR code download...");
+    try {
+      const headers = getAuthHeaders();
+      if (!headers) return;
 
-    // First check if we already have the visitor data
-    const existingVisitor = visitors.find(v => v._id === visitorId);
-    
-    if (existingVisitor?.qr_code) {
-      // Use existing data if available
-      await generateAndDownloadQR(existingVisitor);
-    } else {
-      // Fallback to API request if needed
-      const visitorRes = await axios.get(`${API_BASE_URL}/visitor/${visitorId}`, headers);
-      const visitor = visitorRes.data.data || visitorRes.data;
-      await generateAndDownloadQR(visitor);
+      // First check if we already have the visitor data
+      const existingVisitor = visitors.find(v => v._id === visitorId);
+      
+      if (existingVisitor?.qr_code) {
+        // Use existing data if available
+        await generateAndDownloadQR(existingVisitor);
+      } else {
+        // Fallback to API request if needed
+        const visitorRes = await axios.get(`${API_BASE_URL}/visitor/${visitorId}`, headers);
+        const visitor = visitorRes.data.data || visitorRes.data;
+        await generateAndDownloadQR(visitor);
+      }
+      
+      toast.update(toastId, {
+        render: "QR code downloaded successfully",
+        type: "success",
+        isLoading: false,
+        autoClose: 3000,
+      });
+    } catch (error) {
+      console.error("Error downloading QR code:", error);
+      toast.update(toastId, {
+        render: error.response?.data?.message || error.message || "Failed to download QR code",
+        type: "error",
+        isLoading: false,
+        autoClose: 3000,
+      });
     }
-    
-    toast.update(toastId, {
-      render: "QR code downloaded successfully",
-      type: "success",
-      isLoading: false,
-      autoClose: 3000,
-    });
-  } catch (error) {
-    console.error("Error downloading QR code:", error);
-    toast.update(toastId, {
-      render: error.response?.data?.message || error.message || "Failed to download QR code",
-      type: "error",
-      isLoading: false,
-      autoClose: 3000,
-    });
-  }
-};
+  };
 
-const generateAndDownloadQR = async (visitor) => {
-  if (!visitor?.qr_code) {
-    throw new Error("No QR code available for this visitor");
-  }
-
-  const canvas = document.createElement("canvas");
-  await QRCode.toCanvas(canvas, visitor.qr_code, {
-    width: 400,
-    margin: 2,
-    color: {
-      dark: '#000000',
-      light: '#FFFFFF'
+  const generateAndDownloadQR = async (visitor) => {
+    if (!visitor?.qr_code) {
+      throw new Error("No QR code available for this visitor");
     }
-  });
 
-  const link = document.createElement('a');
-  link.download = `visitor-pass-${visitor.name || visitor._id}.png`;
-  link.href = canvas.toDataURL('image/png');
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-};
+    const canvas = document.createElement("canvas");
+    await QRCode.toCanvas(canvas, visitor.qr_code, {
+      width: 400,
+      margin: 2,
+      color: {
+        dark: '#000000',
+        light: '#FFFFFF'
+      }
+    });
+
+    const link = document.createElement('a');
+    link.download = `visitor-pass-${visitor.name || visitor._id}.png`;
+    link.href = canvas.toDataURL('image/png');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const approveVisitor = async (visitorId) => {
     const toastId = toast.loading("Approving visitor...");
@@ -272,7 +273,7 @@ const generateAndDownloadQR = async (visitor) => {
       const headers = getAuthHeaders();
       if (!headers) return;
 
-      await axios.get(`${API_BASE_URL}/visitor/approve/${visitorId}`, headers);
+      await axios.get(`${API_BASE_URL}/visitor/${visitorId}/approve`, headers);
       
       // Refresh visitor list
       const visitorsRes = await axios.get(`${API_BASE_URL}/visitor/my-visitors`, headers);
@@ -301,7 +302,7 @@ const generateAndDownloadQR = async (visitor) => {
       const headers = getAuthHeaders();
       if (!headers) return;
 
-      await axios.get(`${API_BASE_URL}/visitor/deny/${visitorId}`, headers);
+      await axios.get(`${API_BASE_URL}/visitor/${visitorId}/deny`, headers);
       
       // Refresh visitor list
       const visitorsRes = await axios.get(`${API_BASE_URL}/visitor/my-visitors`, headers);
@@ -317,6 +318,35 @@ const generateAndDownloadQR = async (visitor) => {
       console.error("Error denying visitor:", error);
       toast.update(toastId, {
         render: error.response?.data?.message || "Failed to deny visitor",
+        type: "error",
+        isLoading: false,
+        autoClose: 3000,
+      });
+    }
+  };
+
+  const exitVisitor = async (visitorId) => {
+    const toastId = toast.loading("Recording exit...");
+    try {
+      const headers = getAuthHeaders();
+      if (!headers) return;
+
+      await axios.get(`${API_BASE_URL}/visitor/${visitorId}/exit`, headers);
+      
+      // Refresh visitor list
+      const visitorsRes = await axios.get(`${API_BASE_URL}/visitor/my-visitors`, headers);
+      setVisitors(visitorsRes.data.visitors || []);
+
+      toast.update(toastId, {
+        render: "Visitor exit recorded",
+        type: "success",
+        isLoading: false,
+        autoClose: 3000,
+      });
+    } catch (error) {
+      console.error("Error recording exit:", error);
+      toast.update(toastId, {
+        render: error.response?.data?.message || "Failed to record exit",
         type: "error",
         isLoading: false,
         autoClose: 3000,
@@ -347,7 +377,7 @@ const generateAndDownloadQR = async (visitor) => {
       if (!headers) return;
 
       const response = await axios.put(
-        `${API_BASE_URL}/visitor/update/${editingVisitor}`,
+        `${API_BASE_URL}/visitor/${editingVisitor}`,
         editForm,
         headers
       );
@@ -376,6 +406,27 @@ const generateAndDownloadQR = async (visitor) => {
     }
   };
 
+  const viewVisitorLogs = async (visitorId) => {
+    const toastId = toast.loading("Loading visitor logs...");
+    try {
+      const headers = getAuthHeaders();
+      if (!headers) return;
+
+      const response = await axios.get(`${API_BASE_URL}/visitor/${visitorId}/logs`, headers);
+      setSelectedVisitorLogs(response.data.data);
+      
+      toast.dismiss(toastId);
+    } catch (error) {
+      console.error("Error fetching visitor logs:", error);
+      toast.update(toastId, {
+        render: error.response?.data?.message || "Failed to load visitor logs",
+        type: "error",
+        isLoading: false,
+        autoClose: 3000,
+      });
+    }
+  };
+
   const filteredVisitors = visitors.filter((visitor) => {
     if (!visitor) return false;
 
@@ -391,23 +442,23 @@ const generateAndDownloadQR = async (visitor) => {
     return matchesSearch && matchesDate;
   });
 
-const formatTime = (timeString) => {
-  if (!timeString) return "-";
-  try {
-    const date = new Date(timeString);
-    // Check if the date is valid
-    if (isNaN(date.getTime())) return "-";
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  } catch (error) {
-    return "-";
-  }
-};
+  const formatTime = (timeString) => {
+    if (!timeString) return "-";
+    try {
+      const date = new Date(timeString);
+      // Check if the date is valid
+      if (isNaN(date.getTime())) return "-";
+      return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    } catch (error) {
+      return "-";
+    }
+  };
 
-  const formatDate = (dateString) => {
+  const formatDateTime = (dateString) => {
     if (!dateString) return "-";
     try {
       const date = new Date(dateString);
-      return date.toLocaleDateString("en-US", {
+      return date.toLocaleString("en-US", {
         year: "numeric",
         month: "short",
         day: "numeric",
@@ -428,7 +479,7 @@ const formatTime = (timeString) => {
         return "bg-yellow-100 text-yellow-800";
       case "checked_out":
         return "bg-blue-100 text-blue-800";
-      case "rejected":
+      case "denied":
         return "bg-red-100 text-red-800";
       default:
         return "bg-gray-100 text-gray-800";
@@ -445,10 +496,34 @@ const formatTime = (timeString) => {
         return "Pending Approval";
       case "checked_out":
         return "Checked Out";
-      case "rejected":
-        return "Rejected";
+      case "denied":
+        return "Denied";
       default:
         return status || "Unknown";
+    }
+  };
+
+  const getActionText = (action) => {
+    switch (action?.toLowerCase()) {
+      case "entry":
+        return "Entry";
+      case "exit":
+        return "Exit";
+      default:
+        return action || "Unknown";
+    }
+  };
+
+  const getRoleText = (role) => {
+    switch (role?.toLowerCase()) {
+      case "resident":
+        return "Resident";
+      case "security":
+        return "Security";
+      case "admin":
+        return "Admin";
+      default:
+        return role || "Unknown";
     }
   };
 
@@ -546,20 +621,7 @@ const formatTime = (timeString) => {
               </p>
             </div>
             <div className="flex gap-3">
-              <button
-                onClick={refreshVisitorList}
-                disabled={isLoading}
-                className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg transition disabled:opacity-50"
-              >
-                <RefreshCw size={18} className={isLoading ? "animate-spin" : ""} />
-                Refresh
-              </button>
-              <button
-                onClick={() => navigate("/dashboard")}
-                className="flex items-center gap-2 bg-blue-100 hover:bg-blue-200 text-blue-800 px-4 py-2 rounded-lg transition"
-              >
-                <Home size={18} /> Dashboard
-              </button>
+              
             </div>
           </div>
         </div>
@@ -710,7 +772,7 @@ const formatTime = (timeString) => {
                         {qrData.visitor?.expected_arrival && (
                           <p className="text-sm text-gray-500 flex items-center justify-center gap-1">
                             <Clock size={14} />
-                            Expected: {formatDate(qrData.visitor.expected_arrival)}
+                            Expected: {formatDateTime(qrData.visitor.expected_arrival)}
                           </p>
                         )}
                       </div>
@@ -879,26 +941,26 @@ const formatTime = (timeString) => {
                               {getStatusText(visitor.entry_status)}
                             </span>
                           </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-  <div className="text-sm text-gray-900">
-    {visitor.last_entry_time ? (
-      <>
-        <div className="flex items-center gap-1">
-          <ArrowRightCircle size={14} className="text-green-500" />
-          {formatTime(visitor.last_entry_time)}
-        </div>
-        {visitor.last_exit_time && (
-          <div className="flex items-center gap-1 mt-1">
-            <ArrowLeftCircle size={14} className="text-blue-500" />
-            {formatTime(visitor.last_exit_time)}
-          </div>
-        )}
-      </>
-    ) : (
-      <div className="text-gray-400">No entry recorded</div>
-    )}
-  </div>
-</td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {visitor.entry_time ? (
+                                <>
+                                  <div className="flex items-center gap-1">
+                                    <ArrowRightCircle size={14} className="text-green-500" />
+                                    {formatTime(visitor.entry_time)}
+                                  </div>
+                                  {visitor.exit_time && (
+                                    <div className="flex items-center gap-1 mt-1">
+                                      <ArrowLeftCircle size={14} className="text-blue-500" />
+                                      {formatTime(visitor.exit_time)}
+                                    </div>
+                                  )}
+                                </>
+                              ) : (
+                                <div className="text-gray-400">No entry recorded</div>
+                              )}
+                            </div>
+                          </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             {editingVisitor === visitor._id ? (
                               <div className="flex gap-2">
@@ -932,6 +994,12 @@ const formatTime = (timeString) => {
                                       <Download size={16} /> QR
                                     </button>
                                   )}
+                                  <button
+                                    onClick={() => viewVisitorLogs(visitor._id)}
+                                    className="text-gray-600 hover:text-gray-800 flex items-center gap-1 text-sm"
+                                  >
+                                    <History size={16} /> Logs
+                                  </button>
                                 </div>
                                 {visitor.is_pre_registered && (
                                   <button
@@ -958,7 +1026,14 @@ const formatTime = (timeString) => {
                                     </button>
                                   </div>
                                 )}
-                                
+                                {["granted", "checked_in"].includes(visitor.entry_status) && (
+                                  <button
+                                    onClick={() => exitVisitor(visitor._id)}
+                                    className="text-blue-600 hover:text-blue-800 flex items-center gap-1 text-sm"
+                                  >
+                                    <ArrowLeftCircle size={16} /> Record Exit
+                                  </button>
+                                )}
                               </div>
                             )}
                           </td>
@@ -972,6 +1047,60 @@ const formatTime = (timeString) => {
           )}
         </div>
       </div>
+
+      {/* Visitor Logs Modal */}
+      {selectedVisitorLogs && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold text-gray-800">Visitor Log History</h3>
+                <button
+                  onClick={() => setSelectedVisitorLogs(null)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                {selectedVisitorLogs.length === 0 ? (
+                  <p className="text-gray-500 text-center py-4">No log history available</p>
+                ) : (
+                  <div className="divide-y divide-gray-200">
+                    {selectedVisitorLogs.map((log, index) => (
+                      <div key={index} className="py-3">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-medium text-gray-800">
+                              {getActionText(log.action)} • {getRoleText(log.role)}
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              {formatDateTime(log.timestamp)}
+                            </p>
+                          </div>
+                          <span className={`px-2 py-1 text-xs rounded-full ${
+                            log.action === 'entry' 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            {getActionText(log.action)}
+                          </span>
+                        </div>
+                        {log.performed_by?.name && (
+                          <p className="text-sm text-gray-600 mt-1">
+                            Performed by: {log.performed_by.name}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
