@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { authMiddleware } = require("../middleware/authMiddleware");
-const staffController = require("../controllers/Staff-Controller");
+const staffController = require("../controllers/StaffController");
 
 // Resident-only routes
 router.post("/add-staff", authMiddleware, staffController.registerStaff);

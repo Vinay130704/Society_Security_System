@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const DeliveryRequest = require("../models/Delivery-Model");
+const DeliveryRequest = require("../models/DeliveryModel");
 const generateUniqueId = require("../utils/generateUniqueId");
 const sendSMS = require("../utils/smsSend");
 const User = require("../models/User");

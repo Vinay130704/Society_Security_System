@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const visitorController = require("../controllers/Visitor-Controller");
+const visitorController = require("../controllers/VisitorController");
 const { authMiddleware } = require("../middleware/authMiddleware");
 const multer = require("multer");
 

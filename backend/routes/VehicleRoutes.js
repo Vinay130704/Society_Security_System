@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const vehicleController = require("../controllers/Vehicle-Controller"); // Fixed path
+const vehicleController = require("../controllers/VehicleController"); // Fixed path
 const { authMiddleware } = require("../middleware/authMiddleware");
 
 
