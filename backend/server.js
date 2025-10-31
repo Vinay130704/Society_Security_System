@@ -3,7 +3,6 @@ const http = require("http");
 const dotenv = require("dotenv");
 const cors = require("cors");
 const cron = require("node-cron");
-require('dotenv').config();
 // Load environment variables
 dotenv.config();
 
@@ -53,7 +52,7 @@ app.use(
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use("/uploads", express.static("Uploads"));
+app.use("/uploads", express.static("./uploads"));
 
 // Connect to MongoDB
 connectDB();
