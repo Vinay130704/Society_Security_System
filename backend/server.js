@@ -26,7 +26,7 @@ const deliveryRoutes = require("./routes/DeliveryRoutes");
 const emergencyRoutes = require("./routes/EmergencyRoutes");
 const workerRoutes = require("./routes/workerRoutes");
 const eventRoutes = require("./routes/EventRoutes");
-const profileRoutes = require("./routes/profileRoutes");
+const profileRoutes = require("./routes/ProfileRoutes");
 
 // Initialize Express app
 const app = express();
