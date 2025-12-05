@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { Shield, User, Mail, Lock, Phone, Home, LogIn, Key, ArrowLeft, Clock } from "lucide-react";
-// import SignupImage from "../../assets/signup.jpeg";
+
 import OTPInput from "react-otp-input";
 import Footer from "../../components/Footer";
 import { useAuth } from "../../Context/AuthContext";
@@ -11,7 +11,6 @@ const ResidentSignup = () => {
   const [step, setStep] = useState(1); // 1: Basic info, 2: OTP verification
   const [isLoading, setIsLoading] = useState(false);
   const [otp, setOtp] = useState("");
-  const [otpExpiry, setOtpExpiry] = useState(null);
   const [timeLeft, setTimeLeft] = useState(300); // 5 minutes in seconds
   const navigate = useNavigate();
     const { API } = useAuth();
@@ -104,13 +103,24 @@ const ResidentSignup = () => {
         });
         setStep(2);
         setTimeLeft(300); // Reset timer
-        setOtpExpiry(new Date(Date.now() + 300000)); // Set expiry 5 minutes from now
       } else {
+        let errorMessage = "Failed to send OTP";
+        if (data.message) {
+          errorMessage = Array.isArray(data.message) ? data.message.join(", ") : data.message;
+        } else if (data.error) {
+          errorMessage = Array.isArray(data.error) ? data.error.join(", ") : data.error;
+        } else if (response.status === 400) {
+          errorMessage = "Invalid input data. Please check your information.";
+        } else if (response.status === 409) {
+          errorMessage = "Email already registered. Please use a different email.";
+        } else if (response.status >= 500) {
+          errorMessage = "Server error. Please try again later.";
+        }
         toast.update(toastId, {
-          render: data.message || "Failed to send OTP",
+          render: errorMessage,
           type: "error",
           isLoading: false,
-          autoClose: 3000,
+          autoClose: 5000,
         });
       }
     } catch (error) {
@@ -167,11 +177,25 @@ const ResidentSignup = () => {
           navigate("/");
         }
       } else {
+        let errorMessage = "Registration failed";
+        if (data.message) {
+          errorMessage = Array.isArray(data.message) ? data.message.join(", ") : data.message;
+        } else if (data.error) {
+          errorMessage = Array.isArray(data.error) ? data.error.join(", ") : data.error;
+        } else if (response.status === 400) {
+          errorMessage = "Invalid OTP or registration data. Please check and try again.";
+        } else if (response.status === 401) {
+          errorMessage = "Invalid OTP. Please check the code and try again.";
+        } else if (response.status === 409) {
+          errorMessage = "Email already registered. Please use a different email.";
+        } else if (response.status >= 500) {
+          errorMessage = "Server error. Please try again later.";
+        }
         toast.update(toastId, {
-          render: data.message || "Registration failed",
+          render: errorMessage,
           type: "error",
           isLoading: false,
-          autoClose: 3000,
+          autoClose: 5000,
         });
       }
     } catch (error) {
@@ -224,11 +248,23 @@ const ResidentSignup = () => {
         setTimeLeft(300); // Reset timer to 5 minutes
         setOtp(""); // Clear previous OTP
       } else {
+        let errorMessage = "Failed to resend OTP";
+        if (data.message) {
+          errorMessage = Array.isArray(data.message) ? data.message.join(", ") : data.message;
+        } else if (data.error) {
+          errorMessage = Array.isArray(data.error) ? data.error.join(", ") : data.error;
+        } else if (response.status === 400) {
+          errorMessage = "Invalid request data. Please check your information.";
+        } else if (response.status === 429) {
+          errorMessage = "Too many requests. Please wait before resending.";
+        } else if (response.status >= 500) {
+          errorMessage = "Server error. Please try again later.";
+        }
         toast.update(toastId, {
-          render: data.message || "Failed to resend OTP",
+          render: errorMessage,
           type: "error",
           isLoading: false,
-          autoClose: 3000,
+          autoClose: 5000,
         });
       }
     } catch (error) {
@@ -246,34 +282,28 @@ const ResidentSignup = () => {
 
   return (
     <>
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center px-4 pt-24 pb-8">
-        <div className="w-full max-w-4xl bg-white rounded-xl shadow-xl overflow-hidden transition-all duration-300 hover:shadow-2xl">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center px-2 sm:px-4 pt-16 sm:pt-24 pb-4 sm:pb-8">
+        <div className="mt-4 sm:mt-0 w-full max-w-4xl bg-white rounded-xl shadow-xl overflow-hidden transition-all duration-300 hover:shadow-2xl">
           <div className="flex flex-col md:flex-row">
             {/* Left Side - Image */}
-            <div className="md:w-1/2 bg-gradient-to-b from-primary to-primary-dark hidden md:flex items-center justify-center p-8 relative overflow-hidden">
+            <div className="md:w-1/2 bg-gradient-to-b from-primary to-primary-dark hidden md:flex items-center justify-center p-4 sm:p-8 relative overflow-hidden">
               <div className="absolute inset-0 bg-noise opacity-10"></div>
               <div className="text-center text-white relative z-10">
-                <Shield className="h-16 w-16 mx-auto mb-4 animate-pulse" />
-                <h1 className="text-3xl font-bold mb-2">
+                <Shield className="h-12 sm:h-16 w-12 sm:w-16 mx-auto mb-4 animate-pulse" />
+                <h1 className="text-2xl sm:text-3xl font-bold mb-2">
                   {step === 1 ? "Welcome Resident" : "Verify Your Email"}
                 </h1>
-                <p className="text-gray-200">
+                <p className="text-sm sm:text-base text-gray-200">
                   {step === 1
                     ? "Join your community's security network"
                     : "Enter the 6-digit code sent to your email"}
                 </p>
-                {/* <div className="mt-8 transform hover:scale-105 transition-transform duration-300">
-                  <img
-                    src={SignupImage}
-                    alt="Security System"
-                    className="rounded-lg shadow-lg border-4 border-white/20 object-cover h-64 w-full"
-                  />
-                </div> */}
+
               </div>
             </div>
 
             {/* Right Side - Form */}
-            <div className="md:w-1/2 p-8 md:p-12">
+            <div className="md:w-1/2 p-4 sm:p-8 md:p-12">
               {step === 1 ? (
                 <>
                   <div className="text-center mb-8">
@@ -285,7 +315,7 @@ const ResidentSignup = () => {
                   <form onSubmit={handleSubmitStep1} className="space-y-4">
                     <div className="space-y-1">
                       <label htmlFor="name" className="block text-sm font-medium text-primary">
-                        Full Name
+                        Full Name *
                       </label>
                       <div className="relative">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -295,18 +325,17 @@ const ResidentSignup = () => {
                           type="text"
                           id="name"
                           name="name"
-                          placeholder="John Doe"
+                          placeholder="Enter your full name"
                           value={user.name}
                           onChange={handleChange}
-                          className={`block w-full pl-10 pr-3 py-2 border ${errors.name ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-secondary focus:border-secondary transition-colors`}
+                          className={`block w-full pl-10 pr-3 py-2 border  rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-secondary focus:border-secondary transition-colors`}
                         />
                       </div>
-                      {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
                     </div>
 
                     <div className="space-y-1">
                       <label htmlFor="email" className="block text-sm font-medium text-primary">
-                        Email Address
+                        Email Address *
                       </label>
                       <div className="relative">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -319,15 +348,14 @@ const ResidentSignup = () => {
                           placeholder="your@email.com"
                           value={user.email}
                           onChange={handleChange}
-                          className={`block w-full pl-10 pr-3 py-2 border ${errors.email ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-secondary focus:border-secondary transition-colors`}
+                          className={`block w-full pl-10 pr-3 py-2 border  rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-secondary focus:border-secondary transition-colors`}
                         />
                       </div>
-                      {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
                     </div>
 
                     <div className="space-y-1">
                       <label htmlFor="password" className="block text-sm font-medium text-primary">
-                        Password
+                        Password *
                       </label>
                       <div className="relative">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -340,15 +368,14 @@ const ResidentSignup = () => {
                           placeholder="••••••••"
                           value={user.password}
                           onChange={handleChange}
-                          className={`block w-full pl-10 pr-3 py-2 border ${errors.password ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-secondary focus:border-secondary transition-colors`}
+                          className={`block w-full pl-10 pr-3 py-2 border  rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-secondary focus:border-secondary transition-colors`}
                         />
                       </div>
-                      {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
                     </div>
 
                     <div className="space-y-1">
                       <label htmlFor="phone" className="block text-sm font-medium text-primary">
-                        Phone Number
+                        Phone Number *                        
                       </label>
                       <div className="relative">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -358,18 +385,17 @@ const ResidentSignup = () => {
                           type="tel"
                           id="phone"
                           name="phone"
-                          placeholder="+1 (123) 456-7890"
+                          placeholder="+91 98765 43210"
                           value={user.phone}
                           onChange={handleChange}
-                          className={`block w-full pl-10 pr-3 py-2 border ${errors.phone ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-secondary focus:border-secondary transition-colors`}
+                          className={`block w-full pl-10 pr-3 py-2 border  rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-secondary focus:border-secondary transition-colors`}
                         />
                       </div>
-                      {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
                     </div>
 
                     <div className="space-y-1">
                       <label htmlFor="flat_no" className="block text-sm font-medium text-primary">
-                        Flat Number
+                        Flat Number *
                       </label>
                       <div className="relative">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -382,10 +408,9 @@ const ResidentSignup = () => {
                           placeholder="A-101"
                           value={user.flat_no}
                           onChange={handleChange}
-                          className={`block w-full pl-10 pr-3 py-2 border ${errors.flat_no ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-secondary focus:border-secondary transition-colors`}
+                          className={`block w-full pl-10 pr-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-secondary focus:border-secondary transition-colors`}
                         />
                       </div>
-                      {errors.flat_no && <p className="text-red-500 text-xs mt-1">{errors.flat_no}</p>}
                     </div>
 
                     <div>

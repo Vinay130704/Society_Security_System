@@ -5,10 +5,10 @@ export default {
     extend: {
       colors: {
         primary: "#2C3E50",
-        'primary-dark': "#1A2634", // 20% darker than primary
-        'primary-light': "#3D5166", // 20% lighter than primary
+        'primary-dark': "#1A2634", 
+        'primary-light': "#3D5166", 
         secondary: "#3498DB",
-        'secondary-dark': "#2980B9", // 10% darker than secondary
+        'secondary-dark': "#2980B9", 
         background: "#F5F7FA",
         text: "#333333",
       }
