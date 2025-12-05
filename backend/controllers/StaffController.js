@@ -292,16 +292,16 @@ exports.getStaffHistory = async (req, res) => {
 exports.sendStaffSMS = async (req, res) => {
     try {
         const { phone, message } = req.body;
-        
+
         if (!phone || !message) {
-            return res.status(400).json({ 
+            return res.status(400).json({
                 success: false,
                 message: 'Phone number and message are required'
             });
         }
 
         const result = await sendSMS(phone, message);
-        
+
         res.status(200).json({
             success: true,
             message: 'SMS sent successfully',
@@ -323,7 +323,7 @@ exports.getAllStaff = async (req, res) => {
         const staff = await Staff.find()
             .populate('residentId', 'name email phone')
             .sort({ createdAt: -1 });
-            
+
         res.json({
             success: true,
             count: staff.length,
@@ -344,7 +344,7 @@ exports.getAllStaff = async (req, res) => {
 exports.getStaffWithStats = async (req, res) => {
     try {
         const { residentId } = req.query;
-        
+
         let query = {};
         if (residentId) {
             query.residentId = residentId;
