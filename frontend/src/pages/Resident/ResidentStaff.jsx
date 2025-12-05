@@ -25,7 +25,7 @@ const StaffManagement = () => {
   const [messageRecipient, setMessageRecipient] = useState(null);
   const [editableSmsPhone, setEditableSmsPhone] = useState('');
   const navigate = useNavigate();
-    const { API } = useAuth();
+  const { API } = useAuth();
 
 
   // Get authentication headers with token validation
@@ -179,7 +179,8 @@ const StaffManagement = () => {
   const viewHistory = async (staff) => {
     await toast.promise(
       axios.get(`${API}/staff/history/${staff.permanentId}`, getAuthHeaders()).then(response => {
-        setSelectedStaff({ ...staff, history: response.data.history });
+        const sortedHistory = response.data.history.sort((a, b) => new Date(b.entryTime) - new Date(a.entryTime));
+        setSelectedStaff({ ...staff, history: sortedHistory });
         return 'History loaded successfully';
       }),
       {
@@ -257,7 +258,7 @@ const StaffManagement = () => {
                 {residentData ? `Resident: ${residentData.name}` : 'No resident information available'}
               </p>
             </div>
-           
+
           </div>
         </div>
 
@@ -334,9 +335,8 @@ const StaffManagement = () => {
               <button
                 type="submit"
                 disabled={!residentData}
-                className={`py-3 px-8 rounded-lg transition flex items-center justify-center gap-2 shadow-md ${
-                  residentData ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                }`}
+                className={`py-3 px-8 rounded-lg transition flex items-center justify-center gap-2 shadow-md ${residentData ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  }`}
               >
                 <UserPlus size={18} /> Add Staff Member
               </button>
@@ -361,9 +361,8 @@ const StaffManagement = () => {
                       </p>
                     </div>
                     <span
-                      className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                        staff.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                      }`}
+                      className={`px-3 py-1 rounded-full text-xs font-semibold ${staff.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                        }`}
                     >
                       {staff.status === 'active' ? 'Active' : 'Blocked'}
                     </span>
@@ -440,135 +439,155 @@ const StaffManagement = () => {
               </div>
             )}
           </div>
-      </div>
-
-      {showBlockModal && (
-        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center px-4">
-          <div className="bg-white rounded-lg p-8 w-full max-w-md shadow-lg">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Block {actionStaff?.name}</h2>
-            <p className="text-gray-600 mb-4">Please provide a reason for blocking this staff member:</p>
-            <textarea
-              value={blockRemark}
-              onChange={(e) => setBlockRemark(e.target.value)}
-              placeholder="Enter block reason..."
-              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent mb-6"
-              rows="3"
-            />
-            <div className="flex space-x-3">
-              <button
-                onClick={() => {
-                  setShowBlockModal(false);
-                  setBlockRemark('');
-                  setActionStaff(null);
-                }}
-                className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={blockStaff}
-                disabled={!blockRemark.trim()}
-                className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
-              >
-                Block Staff
-              </button>
-            </div>
-          </div>
         </div>
-      )}
 
-      {showMessageModal && (
-        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center px-4">
-          <div className="bg-white rounded-lg p-8 w-full max-w-md shadow-lg">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Send SMS to {messageRecipient?.name}</h2>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-              <input
-                type="tel"
-                value={editableSmsPhone}
-                onChange={(e) => setEditableSmsPhone(e.target.value)}
-                placeholder="Enter phone number (e.g., +919876543210)"
-                className="w-full p-3 border rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+        {showBlockModal && (
+          <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center px-4">
+            <div className="bg-white rounded-lg p-8 w-full max-w-md shadow-lg">
+              <h2 className="text-xl font-bold text-gray-800 mb-4">Block {actionStaff?.name}</h2>
+              <p className="text-gray-600 mb-4">Please provide a reason for blocking this staff member:</p>
+              <textarea
+                value={blockRemark}
+                onChange={(e) => setBlockRemark(e.target.value)}
+                placeholder="Enter block reason..."
+                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent mb-6"
+                rows="3"
               />
-            </div>
-            <textarea
-              value={messageContent}
-              onChange={(e) => setMessageContent(e.target.value)}
-              placeholder="Type your message..."
-              className="w-full p-3 border rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-6"
-              rows="4"
-              maxLength={160}
-            />
-            <div className="text-right text-xs text-gray-500 mb-4">
-              {messageContent.length}/160 characters
-            </div>
-            <div className="flex space-x-3">
-              <button
-                onClick={() => {
-                  setShowMessageModal(false);
-                  setMessageContent('');
-                  setMessageRecipient(null);
-                  setEditableSmsPhone('');
-                }}
-                className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={sendMessage}
-                disabled={!messageContent.trim() || !editableSmsPhone.trim()}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                <MessageSquare size={16} /> Send SMS
-              </button>
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => {
+                    setShowBlockModal(false);
+                    setBlockRemark('');
+                    setActionStaff(null);
+                  }}
+                  className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={blockStaff}
+                  disabled={!blockRemark.trim()}
+                  className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                >
+                  Block Staff
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {selectedStaff && (
-        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center px-4">
-          <div className="bg-white rounded-lg p-8 w-full max-w-2xl shadow-xl max-h-[80vh] overflow-auto">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">{selectedStaff.name}'s Entry/Exit History</h2>
-            <div className="max-h-96 overflow-y-auto">
-              {selectedStaff.history && selectedStaff.history.length > 0 ? (
-                <div className="space-y-3">
-                  {selectedStaff.history.map((log, index) => (
-                    <div key={index} className="bg-gray-50 p-4 rounded-lg">
-                      <div className="flex items-center justify-start">
-                        <div>
-                          <p className="font-semibold text-green-600">
-                            Entry: {formatDate(log.entryTime)}
-                          </p>
-                          {log.exitTime && (
-                            <p className="font-semibold text-red-600">
-                              Exit: {formatDate(log.exitTime)}
+        {showMessageModal && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center px-4">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl">
+              <h2 className="text-xl font-bold text-gray-800 mb-4">
+                Send SMS to {messageRecipient?.name || "Recipient"}
+              </h2>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Phone Number
+                </label>
+                <input
+                  type="tel"
+                  value={editableSmsPhone}
+                  onChange={(e) => setEditableSmsPhone(e.target.value)}
+                  placeholder="Enter phone number"
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <textarea
+                value={messageContent}
+                onChange={(e) => setMessageContent(e.target.value)}
+                placeholder="Type your message..."
+                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-4"
+                rows="4"
+                maxLength={160}
+              />
+
+              <div className="text-right text-xs text-gray-500 mb-2">
+                {messageContent.length}/160 characters
+              </div>
+
+              <p className="text-sm text-gray-600 mb-4">
+                Send SMS only to verified phone numbers
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowMessageModal(false);
+                    setMessageContent("");
+                    setMessageRecipient(null);
+                    setEditableSmsPhone("");
+                  }}
+                  className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={sendMessage}
+                  disabled={!messageContent.trim() || !editableSmsPhone.trim()}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                >
+                  Send SMS
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+
+        {/* Entry/Exit History Modal  */}
+        {selectedStaff && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center px-4">
+            <div className="bg-white rounded-lg p-6 w-full max-w-2xl shadow-xl max-h-[80vh] overflow-auto">
+              <h2 className="text-xl font-bold text-gray-800 mb-4">
+                {selectedStaff.name}'s Entry/Exit History
+              </h2>
+
+              <div className="max-h-96 overflow-y-auto">
+                {selectedStaff.history && selectedStaff.history.length > 0 ? (
+                  <div className="space-y-3">
+                    {selectedStaff.history.map((log, index) => (
+                      <div key={index} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-semibold text-green-600">
+                              Entry: {formatDate(log.entryTime)}
                             </p>
-                          )}
-                          {!log.exitTime && (
-                            <p className="text-orange-600 font-medium">Currently Inside</p>
-                          )}
+                            {log.exitTime && (
+                              <p className="font-semibold text-red-600">
+                                Exit: {formatDate(log.exitTime)}
+                              </p>
+                            )}
+                            {!log.exitTime && (
+                              <p className="text-orange-600 font-medium">Currently Inside</p>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-gray-600 text-center py-8">No entry/exit history available</p>
-              )}
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-600 text-center py-8">
+                    No entry/exit history available
+                  </p>
+                )}
+              </div>
+
+              <button
+                onClick={() => setSelectedStaff(null)}
+                className="mt-6 w-full bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
+              >
+                Close
+              </button>
             </div>
-            <button
-              onClick={() => setSelectedStaff(null)}
-              className="mt-6 w-full bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
-            >
-              Close
-            </button>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
-  </div>
-);
+  );
 };
 
 export default StaffManagement;

@@ -31,7 +31,7 @@ const ResidentVehicleManagement = () => {
   const [showLogsModal, setShowLogsModal] = useState(false);
   const [showVehicleForm, setShowVehicleForm] = useState(false);
   const navigate = useNavigate();
-    const { API } = useAuth();
+  const { API } = useAuth();
 
   const [personalVehicleForm, setPersonalVehicleForm] = useState({
     vehicle_no: "",
@@ -230,28 +230,28 @@ const ResidentVehicleManagement = () => {
     try {
       setLoading(true);
       const response = await axios.get(
-        `${API}/vehicle/logs/${vehicleId}`, 
+        `${API}/vehicle/logs/${vehicleId}`,
         getAuthHeaders()
       );
-      
+
       if (response.data.success) {
         const vehicle = vehicles.find(v => v._id === vehicleId);
         if (!vehicle) {
           throw new Error('Vehicle not found');
         }
-        
+
         setSelectedVehicle(vehicle);
         setVehicleLogs(response.data.logs || []);
         setShowLogsModal(true);
       } else {
-        toast.error(response.data.message || 'Failed to load vehicle logs', { 
-          position: 'top-right', 
-          autoClose: 5000 
+        toast.error(response.data.message || 'Failed to load vehicle logs', {
+          position: 'top-right',
+          autoClose: 5000
         });
       }
     } catch (error) {
       console.error('Error fetching vehicle logs:', error);
-      
+
       let errorMessage = 'Failed to load vehicle logs';
       if (error.response) {
         if (error.response.status === 403) {
@@ -260,10 +260,10 @@ const ResidentVehicleManagement = () => {
           errorMessage = error.response.data.message;
         }
       }
-      
-      toast.error(errorMessage, { 
-        position: 'top-right', 
-        autoClose: 5000 
+
+      toast.error(errorMessage, {
+        position: 'top-right',
+        autoClose: 5000
       });
     } finally {
       setLoading(false);
@@ -384,7 +384,7 @@ const ResidentVehicleManagement = () => {
               </p>
             </div>
             <div className="flex gap-3">
-            
+
             </div>
           </div>
         </div>
@@ -393,20 +393,20 @@ const ResidentVehicleManagement = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Vehicle List */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-bold text-gray-800">Your Vehicles</h2>
+            <div className="bg-white rounded-xl shadow p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
+                <h2 className="text-lg sm:text-xl font-bold text-gray-800">Your Vehicles</h2>
                 <button
                   onClick={() => setShowVehicleForm(!showVehicleForm)}
-                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
+                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-4 py-2 rounded-lg transition text-sm sm:text-base w-full sm:w-auto justify-center"
                 >
                   {showVehicleForm ? (
                     <>
-                      <ChevronUp size={18} /> Hide Form
+                      <ChevronUp size={16} /> Hide Form
                     </>
                   ) : (
                     <>
-                      <Plus size={18} /> Add Vehicle
+                      <Plus size={16} /> Add Vehicle
                     </>
                   )}
                 </button>
@@ -414,29 +414,31 @@ const ResidentVehicleManagement = () => {
 
               {/* Vehicle Registration Form */}
               {showVehicleForm && (
-                <div className="bg-gray-50 rounded-xl p-6 mb-6 border border-gray-200">
-                  <div className="flex items-center space-x-3 mb-4">
-                    <UserPlus className="text-blue-600" size={24} />
-                    <h3 className="text-lg font-semibold text-gray-800">
+                <div className="bg-gray-50 rounded-xl p-4 sm:p-6 mb-6 border border-gray-200">
+                  <div className="flex items-center gap-2 sm:gap-3 mb-4">
+                    <UserPlus className="text-blue-600" size={20} />
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-800">
                       {activeTab === "personal" ? "Register Personal Vehicle" : "Register Guest Vehicle"}
                     </h3>
                   </div>
 
                   {/* Tabs */}
-                  <div className="flex border-b border-gray-200 mb-6">
+                  <div className="flex border-b border-gray-200 mb-4 sm:mb-6 overflow-x-auto">
                     <button
                       onClick={() => setActiveTab("personal")}
-                      className={`px-4 py-2 font-medium text-sm ${
-                        activeTab === "personal" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-gray-700"
-                      }`}
+                      className={`px-3 sm:px-4 py-2 font-medium text-sm whitespace-nowrap ${activeTab === "personal"
+                        ? "text-blue-600 border-b-2 border-blue-600"
+                        : "text-gray-500 hover:text-gray-700"
+                        }`}
                     >
                       Personal Vehicle
                     </button>
                     <button
                       onClick={() => setActiveTab("guest")}
-                      className={`px-4 py-2 font-medium text-sm ${
-                        activeTab === "guest" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-gray-700"
-                      }`}
+                      className={`px-3 sm:px-4 py-2 font-medium text-sm whitespace-nowrap ${activeTab === "guest"
+                        ? "text-blue-600 border-b-2 border-blue-600"
+                        : "text-gray-500 hover:text-gray-700"
+                        }`}
                     >
                       Guest Vehicle
                     </button>
@@ -444,11 +446,11 @@ const ResidentVehicleManagement = () => {
 
                   {/* Personal Vehicle Form */}
                   {activeTab === "personal" && (
-                    <div className="space-y-4">
+                    <div className="space-y-3 sm:space-y-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Vehicle Number *</label>
                         <div className="relative">
-                          <Car className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                          <Car className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
                           <input
                             type="text"
                             placeholder="e.g., MH12AB1234"
@@ -459,7 +461,7 @@ const ResidentVehicleManagement = () => {
                                 vehicle_no: e.target.value.toUpperCase(),
                               })
                             }
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                            className="w-full pl-9 pr-3 sm:pl-10 sm:pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm sm:text-base"
                             required
                           />
                         </div>
@@ -469,7 +471,7 @@ const ResidentVehicleManagement = () => {
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Vehicle Type *</label>
                         <div className="relative">
-                          <Car className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                          <Car className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
                           <select
                             value={personalVehicleForm.vehicle_type}
                             onChange={(e) =>
@@ -478,7 +480,7 @@ const ResidentVehicleManagement = () => {
                                 vehicle_type: e.target.value,
                               })
                             }
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition appearance-none"
+                            className="w-full pl-9 pr-3 sm:pl-10 sm:pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm sm:text-base appearance-none"
                             required
                           >
                             <option value="car">Car</option>
@@ -488,24 +490,23 @@ const ResidentVehicleManagement = () => {
                         </div>
                       </div>
 
-                      <div className="pt-2">
+                      <div className="pt-1 sm:pt-2">
                         <button
                           onClick={registerPersonalVehicle}
                           disabled={!personalVehicleForm.vehicle_no || loading}
-                          className={`w-full py-2 rounded-lg transition flex items-center justify-center gap-2 ${
-                            personalVehicleForm.vehicle_no && !loading
-                              ? "bg-blue-600 hover:bg-blue-700 text-white"
-                              : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                          }`}
+                          className={`w-full py-2 rounded-lg transition flex items-center justify-center gap-2 text-sm sm:text-base ${personalVehicleForm.vehicle_no && !loading
+                            ? "bg-blue-600 hover:bg-blue-700 text-white"
+                            : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                            }`}
                         >
                           {loading ? (
                             <span className="flex items-center">
-                              <RefreshCw className="animate-spin mr-2" size={18} />
+                              <RefreshCw className="animate-spin mr-2" size={16} />
                               Processing...
                             </span>
                           ) : (
                             <>
-                              <Plus size={18} /> Register Vehicle
+                              <Plus size={16} /> Register Vehicle
                             </>
                           )}
                         </button>
@@ -515,11 +516,11 @@ const ResidentVehicleManagement = () => {
 
                   {/* Guest Vehicle Form */}
                   {activeTab === "guest" && (
-                    <div className="space-y-4">
+                    <div className="space-y-3 sm:space-y-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Select Visitor *</label>
                         <div className="relative">
-                          <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                          <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
                           <select
                             value={guestVehicleForm.visitor_id}
                             onChange={(e) =>
@@ -528,7 +529,7 @@ const ResidentVehicleManagement = () => {
                                 visitor_id: e.target.value,
                               })
                             }
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition appearance-none"
+                            className="w-full pl-9 pr-3 sm:pl-10 sm:pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm sm:text-base appearance-none"
                             required
                             disabled={loading || visitors.length === 0}
                           >
@@ -548,7 +549,7 @@ const ResidentVehicleManagement = () => {
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Vehicle Number *</label>
                         <div className="relative">
-                          <Car className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                          <Car className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
                           <input
                             type="text"
                             placeholder="e.g., MH12AB1234"
@@ -559,7 +560,7 @@ const ResidentVehicleManagement = () => {
                                 vehicle_no: e.target.value.toUpperCase(),
                               })
                             }
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                            className="w-full pl-9 pr-3 sm:pl-10 sm:pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm sm:text-base"
                             required
                             disabled={loading}
                           />
@@ -570,7 +571,7 @@ const ResidentVehicleManagement = () => {
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Vehicle Type *</label>
                         <div className="relative">
-                          <Car className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                          <Car className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
                           <select
                             value={guestVehicleForm.vehicle_type}
                             onChange={(e) =>
@@ -579,7 +580,7 @@ const ResidentVehicleManagement = () => {
                                 vehicle_type: e.target.value,
                               })
                             }
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition appearance-none"
+                            className="w-full pl-9 pr-3 sm:pl-10 sm:pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm sm:text-base appearance-none"
                             required
                             disabled={loading}
                           >
@@ -590,24 +591,23 @@ const ResidentVehicleManagement = () => {
                         </div>
                       </div>
 
-                      <div className="pt-2">
+                      <div className="pt-1 sm:pt-2">
                         <button
                           onClick={registerGuestVehicle}
                           disabled={!guestVehicleForm.visitor_id || !guestVehicleForm.vehicle_no || loading || visitors.length === 0}
-                          className={`w-full py-2 rounded-lg transition flex items-center justify-center gap-2 ${
-                            guestVehicleForm.visitor_id && guestVehicleForm.vehicle_no && !loading && visitors.length > 0
-                              ? "bg-blue-600 hover:bg-blue-700 text-white"
-                              : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                          }`}
+                          className={`w-full py-2 rounded-lg transition flex items-center justify-center gap-2 text-sm sm:text-base ${guestVehicleForm.visitor_id && guestVehicleForm.vehicle_no && !loading && visitors.length > 0
+                            ? "bg-blue-600 hover:bg-blue-700 text-white"
+                            : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                            }`}
                         >
                           {loading ? (
                             <span className="flex items-center">
-                              <RefreshCw className="animate-spin mr-2" size={18} />
+                              <RefreshCw className="animate-spin mr-2" size={16} />
                               Processing...
                             </span>
                           ) : (
                             <>
-                              <Plus size={18} /> Register Vehicle
+                              <Plus size={16} /> Register Vehicle
                             </>
                           )}
                         </button>
@@ -619,76 +619,74 @@ const ResidentVehicleManagement = () => {
 
               {/* Vehicle List */}
               {loading && vehicles.length === 0 ? (
-                <div className="flex justify-center py-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+                <div className="flex justify-center py-8 sm:py-12">
+                  <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-t-2 border-b-2 border-blue-500"></div>
                 </div>
               ) : vehicles.length > 0 ? (
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   {vehicles.map((vehicle) => (
-                    <div key={vehicle._id} className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition-all">
-                      <div className="flex justify-between items-start">
+                    <div key={vehicle._id} className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4 hover:shadow-md transition-all">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
                         <div className="flex items-center gap-3">
                           <div
-                            className={`p-3 rounded-lg ${
-                              vehicle.current_status === "inside" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-                            }`}
+                            className={`p-2 sm:p-3 rounded-lg ${vehicle.current_status === "inside" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                              }`}
                           >
                             {getVehicleIcon(vehicle.vehicle_type)}
                           </div>
                           <div>
-                            <h3 className="font-bold text-gray-800">{vehicle.vehicle_no}</h3>
-                            <p className="text-sm text-gray-600 capitalize">
+                            <h3 className="font-bold text-gray-800 text-sm sm:text-base">{vehicle.vehicle_no}</h3>
+                            <p className="text-xs sm:text-sm text-gray-600 capitalize">
                               {vehicle.vehicle_type} • {vehicle.is_guest ? "Guest Vehicle" : "Personal Vehicle"}
                             </p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 self-end sm:self-center">
                           <span
-                            className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                              vehicle.current_status === "inside" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-                            }`}
+                            className={`px-2 py-1 rounded-full text-xs font-semibold ${vehicle.current_status === "inside" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                              }`}
                           >
                             {vehicle.current_status === "inside" ? "Inside" : "Outside"}
                           </span>
                         </div>
                       </div>
 
-                      <div className="mt-4 pt-4 border-t border-gray-100 flex justify-between items-center">
-                        <div className="text-sm text-gray-600">
+                      <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
+                        <div className="text-xs sm:text-sm text-gray-600">
                           {vehicle.is_guest ? (
                             <p className="flex items-center">
-                              <UserPlus size={14} className="mr-1" />
+                              <UserPlus size={12} className="mr-1" />
                               {vehicle.visitor_name || "Guest"}
                             </p>
                           ) : (
                             <p className="flex items-center">
-                              <User size={14} className="mr-1" />
+                              <User size={12} className="mr-1" />
                               {residentData?.name}
                             </p>
                           )}
                           {vehicle.last_timestamp && (
                             <p className="flex items-center mt-1">
-                              <Clock size={14} className="mr-1" />
+                              <Clock size={12} className="mr-1" />
                               Last {vehicle.last_action?.toLowerCase()}: {formatDate(vehicle.last_timestamp)}
                             </p>
                           )}
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 self-end sm:self-center">
                           <button
                             onClick={() => viewVehicleLogs(vehicle._id)}
                             disabled={loading}
-                            className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors"
+                            className="p-1.5 sm:p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors"
                             title="View logs"
                           >
-                            <Clock size={16} />
+                            <Clock size={14} />
                           </button>
                           <button
                             onClick={() => deleteVehicle(vehicle._id)}
                             disabled={loading}
-                            className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
+                            className="p-1.5 sm:p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
                             title="Delete vehicle"
                           >
-                            <Trash2 size={16} />
+                            <Trash2 size={14} />
                           </button>
                         </div>
                       </div>
@@ -696,63 +694,82 @@ const ResidentVehicleManagement = () => {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-12">
-                  <Car size={48} className="mx-auto h-16 w-16 text-gray-300 mb-4" />
-                  <p className="text-lg text-gray-600 mb-2">No vehicles registered yet</p>
-                  <p className="text-gray-500">Add your first vehicle using the button above</p>
+                <div className="text-center py-8 sm:py-12">
+                  <Car size={40} className="mx-auto h-12 w-12 sm:h-16 sm:w-16 text-gray-300 mb-3 sm:mb-4" />
+                  <p className="text-base sm:text-lg text-gray-600 mb-1 sm:mb-2">No vehicles registered yet</p>
+                  <p className="text-sm sm:text-base text-gray-500">Add your first vehicle using the button above</p>
                 </div>
               )}
             </div>
           </div>
 
           {/* Status Summary */}
-          <div className="space-y-6">
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h2 className="text-xl font-bold text-gray-800 mb-4">Vehicle Status Summary</h2>
-              <div className="space-y-3">
+          <div className="space-y-4 sm:space-y-6">
+            <div className="bg-white rounded-xl shadow p-4 sm:p-6">
+              <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4">Vehicle Status Summary</h2>
+              <div className="space-y-2 sm:space-y-3">
                 <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
-                  <span className="text-green-700 font-medium">Inside Premises</span>
-                  <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-semibold">
+                  <span className="text-green-700 font-medium text-sm sm:text-base">Inside Premises</span>
+                  <span className="bg-green-100 text-green-800 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold">
                     {vehicles.filter((v) => v.current_status === "inside").length}
                   </span>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
-                  <span className="text-red-700 font-medium">Outside Premises</span>
-                  <span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-semibold">
+                  <span className="text-red-700 font-medium text-sm sm:text-base">Outside Premises</span>
+                  <span className="bg-red-100 text-red-800 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold">
                     {vehicles.filter((v) => v.current_status === "outside").length}
                   </span>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-                  <span className="text-blue-700 font-medium">Total Vehicles</span>
-                  <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-semibold">{vehicles.length}</span>
+                  <span className="text-blue-700 font-medium text-sm sm:text-base">Total Vehicles</span>
+                  <span className="bg-blue-100 text-blue-800 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold">
+                    {vehicles.length}
+                  </span>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h2 className="text-xl font-bold text-gray-800 mb-4">Recent Activity</h2>
-              {vehicles.length > 0 ? (
+            {/* Recent Activity */}
+            <div className="bg-white rounded-xl shadow-sm p-5">
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Recent Activity</h2>
+
+              {vehicles.filter(v => v.last_timestamp).length > 0 ? (
                 <div className="space-y-4">
                   {vehicles
-                    .filter((v) => v.last_timestamp)
+                    .filter(v => v.last_timestamp)
                     .sort((a, b) => new Date(b.last_timestamp) - new Date(a.last_timestamp))
                     .slice(0, 3)
                     .map((vehicle) => (
-                      <div key={vehicle._id} className="flex items-start gap-3">
-                        <div className="mt-1">{getStatusIcon(vehicle.current_status)}</div>
-                        <div>
+                      <div key={vehicle._id} className="flex items-start gap-3 p-3 hover:bg-gray-50 rounded-lg transition-colors">
+                        <div className="mt-1">
+                          {vehicle.current_status === "inside" ? (
+                            <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
+                              <span className="text-green-600 text-sm font-medium">✓</span>
+                            </div>
+                          ) : (
+                            <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
+                              <span className="text-red-600 text-sm font-medium">→</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1">
                           <p className="text-sm font-medium text-gray-800">
-                            {vehicle.vehicle_no} ({vehicle.vehicle_type})
+                            {vehicle.vehicle_no}
+                            <span className="text-gray-500 ml-2 text-xs capitalize">({vehicle.vehicle_type})</span>
                           </p>
-                          <p className="text-xs text-gray-500">
-                            {vehicle.last_action} at {formatDate(vehicle.last_timestamp)}
+                          <p className="text-xs text-gray-500 mt-1">
+                            {vehicle.last_action === "entry" ? "Entered" : "Exited"} • {formatDate(vehicle.last_timestamp)}
                           </p>
                         </div>
                       </div>
                     ))}
                 </div>
               ) : (
-                <p className="text-gray-500 text-center py-4">No recent activity</p>
+                <div className="text-center py-6">
+                  <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
+                  </div>
+                  <p className="text-gray-500 text-sm">No recent activity</p>
+                </div>
               )}
             </div>
           </div>
@@ -780,9 +797,8 @@ const ResidentVehicleManagement = () => {
               <div className="mb-4">
                 <div className="flex items-center gap-3">
                   <div
-                    className={`p-2 rounded-lg ${
-                      selectedVehicle.current_status === "inside" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-                    }`}
+                    className={`p-2 rounded-lg ${selectedVehicle.current_status === "inside" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                      }`}
                   >
                     {getVehicleIcon(selectedVehicle.vehicle_type)}
                   </div>
@@ -795,16 +811,14 @@ const ResidentVehicleManagement = () => {
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <span
-                    className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                      selectedVehicle.current_status === "inside" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-                    }`}
+                    className={`px-2 py-1 rounded-full text-xs font-semibold ${selectedVehicle.current_status === "inside" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                      }`}
                   >
                     Current Status: {selectedVehicle.current_status === "inside" ? "Inside" : "Outside"}
                   </span>
                   <span
-                    className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                      selectedVehicle.entry_status === "allowed" ? "bg-blue-100 text-blue-700" : "bg-yellow-100 text-yellow-700"
-                    }`}
+                    className={`px-2 py-1 rounded-full text-xs font-semibold ${selectedVehicle.entry_status === "allowed" ? "bg-blue-100 text-blue-700" : "bg-yellow-100 text-yellow-700"
+                      }`}
                   >
                     Entry Status: {selectedVehicle.entry_status === "allowed" ? "Allowed" : "Blocked"}
                   </span>
